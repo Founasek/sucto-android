@@ -1,0 +1,80 @@
+# Funkční shoda s iOS
+
+Předloha: Founasek/sucto-iOS, revize 0e22fa74f59af541371cf017bb7cea6ba5985a14.
+Toto je mapa zdrojového kódu, nikoli potvrzení shody při běhu. iOS změny sledovat před každou etapou.
+
+| Oblast | Chování v iOS | Android stav |
+| --- | --- | --- |
+| Přihlášení | POST sessions/create, email/password, authentication_token | První implementace, neověřeno |
+| Firmy | GET companies, výběr aktivní firmy | Načtení a výběr firmy, změna firmy z menu |
+| Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury; srovnání/aging/forecast/partneři/zpráva zbývají |
+| Faktury | Vydané/přijaté, stránkování, hledání, rychlé a podrobné filtry | Oba směry, hledání, rychlé i podrobné filtry a další stránky; neověřeno za běhu |
+| Detail faktury | stavy, položky, partner, účet, data, kopírování, platební QR | Čtení detailu, stav, datumy, VS, účet, položky a QR včetně sdílení; kopírování jednotlivých polí zbývá |
+| Akce faktury | úhrada vydané faktury, e-mail, ruční upomínka | Zbývá |
+| Nová faktura | oba směry, číselníky, položky, DPH, součty, duplikace | Formulář obou směrů, partneři, číselníky, položky, výpočty, validace a duplikace implementovány; neověřeno za běhu |
+| Úpravy položek | přidání, úprava a mazání řádků existující faktury | Zbývá |
+| Pokladna | příjmové/výdajové, hledání, stránkování, detail, odeslání | Oba směry, hledání, další stránky a základní detail; odesílání zbývá |
+| Partneři | hledání, detail, obratové grafy, formulář, úprava/mazání, ARES | Zbývá |
+| Účty | seznam, detail, měna | Zbývá |
+| Export | CSV aktuálního filtru, Pohoda XML jednotlivě/období a sdílení | Zbývá |
+| Skeny | kamera/soubory, upload, polling, náhled, předvyplnění přijaté faktury | V iOS vypnuto; Android zachová přepínač |
+| Relace | Keychain token, odhlášení na 401, mazání cache při odhlášení | Zatím token pouze v paměti, 401 odhlásí |
+| Oprávnění | create/read/update/destroy pro ActuarialsIn/Out a Partner | create u faktur implementováno; ostatní zdroje/akce zbývají |
+| Offline | uložená GET data, datum cache, platnost 30 dní, šifrování | Zbývá |
+| Zámek | biometrie/kód zařízení, studený start, prodleva 0/60/300 s | Zbývá, Android BiometricPrompt/Keystore |
+| Uložené přihlášení | volitelné, zabezpečené, biometrické ověření | Zbývá |
+| Upozornění | splatnosti denně 9:00, bez částek a jmen, plánování při otevření | Zbývá |
+| Widget | snapshot splatností firmy, obnova po otevření, soukromí | Zbývá, Android AppWidget |
+| Nastavení | zámek, rychlé přihlášení, upozornění, upomínky, widget, cache, verze | Zbývá |
+
+## Smlouva API a významné zvláštnosti
+
+- Base URL https://www.sucto.cz/api/, autorizace `Auth-Token`, běžný timeout 30 s, upload 120 s.
+- API klient: 401 = odhlášení; 403 = oprávnění; 400/422 = serverová validace.
+  `errors` může být text, seznam nebo mapa polí na seznamy. Některé akce vracejí prázdné tělo.
+- Endpointy faktur: companies/{id}/actuarials_outs a actuarials_ins.
+- Úhrada vydané faktury je **GET .../{invoiceId}/pay**, přesto vytváří pokladní doklad.
+  Nikdy ji neprovádět při přednačítání a nikdy ji neobsluhovat z offline cache.
+- Cache v iOS vynechává hledání `_cont`, `/new` a `/pay`; fallback nastává jen při výpadku sítě.
+- Hledaný text s číslicí se bere jako číslo dokladu, jinak jako jméno partnera.
+- Filtr po splatnosti používá nejvýše včerejší due_date; klient vyřazuje zaplacené/stornované doklady.
+  Podrobný stav má přednost před rychlým filtrem; paid=8, concept=1.
+- Částky mají v části modelů tolerantní dekódování text/číslo; port nesmí předpokládat jednotný JSON typ.
+- Pole status pokladního dokladu se záměrně ignoruje: iOS popisuje, že server vrací nabídku akce storno,
+  nikoliv skutečný stav dokladu.
+- Řádek: základ = množství × jednotková cena × (1 − sleva/100); DPH = základ × sazba/100.
+  Při portu zachovat chování a ověřit zaokrouhlení na telefonu proti serveru.
+- Oprávnění v iOS při nedostupných údajích akce nezablokují, konečné rozhodnutí nechávají serveru.
+- Upomínky se neposílají automaticky. Uživatel potvrzuje každý e-mail a může upravit text.
+
+## Vizuální a platformní pravidla
+
+- Brand #55B560, ink #0E2A1C, inkSoft #17402B, gradient #2F9E55 → #1B6B3D.
+- Rozestupy 4/8/12/16/24/32, radius karty 20, ovládací prvky 14, login karta 28, logo 88.
+- Přihlášení v tmavém vzhledu; ostatní obrazovky respektují systémový světlý/tmavý režim.
+- Zachovat obsah, hierarchii, pořadí sekcí a české texty.
+- SwiftUI Form/sheet/picker/menu/tab bar převést na Material 3 komponenty,
+  systémové sdílení, Android výběr souborů, biometrické ověření a systémové Back.
+- Dashboard má Přehled / Faktury / Pokladna. Faktury přepínají Vydané / Přijaté.
+- Skutečná vizuální shoda se bude posuzovat na telefonu; ze SwiftUI zdrojů nelze potvrdit pixelovou shodu.
+
+## Otevřená rozhodnutí
+
+- Nejstarší podporovaný Android: pracovní návrh 8.0 (API 26), čeká na volbu zadavatele.
+- Finální applicationId: pracovní návrh cz.sucto.android, potvrdit před vydáním.
+- Produkční API bez testovacího prostředí; zadavatel provede testy na telefonu.
+- Publikace, signing a Google Play účet se řeší až před distribucí.
+## Upřesnění datumů
+Odpovědi API mají český formát dd. MM. yyyy (iOS String.toDate). Parametry dotazů používají yyyy-MM-dd. Android parser čte oba formáty.
+
+## Etapa 3
+
+- Nová vydaná/přijatá faktura a duplikace podle iOS, číslo/datumy z `/new`.
+- Partner se hledá podle názvu/IČ/DIČ/adresy; při výběru se doplní splatnost a případně měna.
+- Rozepsaná faktura držena v paměti ViewModelu přes otočení telefonu; po ukončení procesu se záměrně neukládá.
+- Tvorba faktury se provede až klepnutím uživatele na Vytvořit fakturu. Žádný zápis nebyl proveden vývojovým nástrojem.
+- Síťové požadavky se automaticky neopakují; při nejasném výsledku vytvoření UI upozorní na kontrolu seznamu.
+- QR normativní podklad: https://qr-platba.cz/pro-vyvojare/specifikace-formatu/.
+  SPAYD je generován lokálně bez sdílení finančních údajů s generátorem třetí strany.
+  AM se omezí na podporovaných 9 999 999,99; nad tímto limitem se QR nenabízí.
+- Nic nebylo sestaveno, spuštěno ani testováno podle pokynu zadavatele.

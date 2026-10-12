@@ -1,0 +1,51 @@
+# Průběh práce
+
+## 2026-10-12
+
+- Dokončeno: inventura iOS obrazovek, modelů, navigace a API klienta.
+- Dokončeno: rozbor relace, oprávnění, cache, zámku, nastavení a feature flags.
+- Zjištění: API https://www.sucto.cz/api/, autentizace hlavičkou Auth-Token.
+- Zjištění: skeny jsou ve výchozí iOS verzi vypnuté.
+- Zjištění: úhrada vydané faktury je mutující GET /pay; nesmí se cachovat.
+- Založeno: Android Gradle projekt, Kotlin/Compose/Material 3, SDK 36, minSdk 26.
+- Převzato: značkové logo, zelená paleta a rozměry karet z iOS.
+- Rozpracováno: první etapa přihlášení a načtení firem.
+- Pokyn zadavatele: nespouštět testování; ověření proběhne na telefonu u zadavatele.
+- Dokončeno: zdrojové soubory přihlašovací obrazovky, API klienta, ViewModelu a seznamu firem (bez spuštění).
+- Dokončeno: docs/IOS_PARITY.md s mapou funkcí a zvláštností API.
+- Zbývá: dashboard a navazující funkce, zabezpečené trvalé uložení relace, ověření na telefonu.
+
+- Etapa 2: doplněny modely faktur, peněžní částky BigDecimal, datumy a rychlé filtry.
+- Etapa 2: API pro seznam/detail faktur a přehled z účetního deníku; při 403 fallback na faktury, měny odděleně.
+
+- Etapa 2: výběr firmy otevře dashboard, systémové Back vrací do firem nebo ze detailu.
+- Etapa 2: přehled s rokem, součty po měnách a měsíčním grafem, vydané/přijaté faktury, hledání, rychlé filtry, další stránky a čtení detailu.
+- Etapa 2: změny hledání mají 400 ms prodlevu; starší odpovědi se ignorují a odchod z dashboardu zruší úlohy.
+
+- Etapa 2: doplněna Pokladna s příjmovými/výdajovými doklady, hledáním, stránkováním a detailem.
+- Etapa 2: OkHttp požadavky jsou asynchronní a ruší se se zrušením coroutine.
+- Etapa 2: dashboard/pokladna mají vlastní ViewModelStore, který se při změně firmy či odhlášení vyčistí.
+- Etapa 2 dokončena ve zdrojích; bez sestavení, spuštění, testů a volání API dle pokynu zadavatele.
+- Další etapa: podrobné filtry, úplné detaily a platební QR, formulář nové/duplikované faktury a akce dokladů.
+
+- Upřesnění z iOS InvoiceInitResponse: datumy odpovědi API jsou dd. MM. yyyy. Android parser podporuje český i ISO formát; použito pro splatnosti a měsíční součty.
+
+- Etapa 3: rozebrána tvorba/duplikace faktury a SPAYD QR v iOS.
+- Etapa 3: model formuláře, výpočty položek, reference pro partnery/účty/měny/DPH a API vytvoření faktury připraveny ve zdrojích.
+
+- GitHub: nastaven origin https://github.com/Founasek/sucto-android.git dle zadavatele; nic nebylo odesláno.
+
+- Etapa 3: formulář propojen s tlačítkem nové faktury a duplikací z detailu; datumy a číslo z /new, číselníky ze serveru.
+- Etapa 3: podrobné filtry propojeny se seznamem; stav má přednost a datum po splatnosti se omezuje na včerejšek.
+- Etapa 3: platební QR se generuje lokálně, používá zbývající dluh, kontrolu IBAN a sdílení PNG přes Android FileProvider.
+- Etapa 3: oprávnění create načítána pro oba směry; při neznámých oprávněních rozhoduje server jako v iOS.
+
+- Etapa 3: relace firmy a formuláře drží ViewModelStore v rodičovském ViewModelu, aby otočení telefonu nesmazalo rozepsanou fakturu. Při změně firmy/odhlášení se úložiště čistí.
+- Etapa 3: opuštění formuláře vyžaduje potvrzení zahození; během odesílání je návrat zablokovaný.
+
+- Etapa 3: doplněno potvrzení úspěšného vytvoření, detaily platebního účtu a patička faktury.
+- Etapa 3 dokončena ve zdrojích: nové/duplikované faktury, podrobné filtry, platební QR a sdílení.
+- Podle pokynu zadavatele: bez sestavení, spuštění, testů a volání sÚčto API. GitHub origin nastaven, bez push.
+- Další etapa: úhrady a e-maily, úpravy existujících položek, partneři/ARES a exporty; poté offline data, biometrie a widget.
+
+- Zadavatel požádal o commit a push aktuální fáze na origin/main. Sestavení ani testy se pro tento snapshot nespouštějí.
