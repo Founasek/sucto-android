@@ -17,6 +17,15 @@ object AppSettings {
     fun setReminderTemplate(context: Context, value: String?) =
         prefs(context).edit().apply { if (value.isNullOrBlank()) remove("reminderTemplate") else putString("reminderTemplate", value) }.apply()
 
+    /** Denní upozornění na splatnosti jsou ve výchozím stavu vypnutá; podrobnosti (firma, počty) také. */
+    fun dueNotificationsEnabled(context: Context) = prefs(context).getBoolean("dueNotifications", false)
+    fun setDueNotificationsEnabled(context: Context, value: Boolean) = prefs(context).edit().putBoolean("dueNotifications", value).apply()
+    fun dueNotificationDetails(context: Context) = prefs(context).getBoolean("dueNotificationDetails", false)
+    fun setDueNotificationDetails(context: Context, value: Boolean) = prefs(context).edit().putBoolean("dueNotificationDetails", value).apply()
+    /** Název naposledy otevřené firmy pro podrobné upozornění (úloha na pozadí nemá celý objekt firmy). */
+    fun lastCompanyName(context: Context): String? = prefs(context).getString("lastCompanyName", null)
+    fun setLastCompanyName(context: Context, value: String?) = prefs(context).edit().apply { if (value == null) remove("lastCompanyName") else putString("lastCompanyName", value) }.apply()
+
     /** Za jak dlouho v pozadí se aplikace zamkne (ihned / 1 min / 5 min). */
     fun lockDelayMs(context: Context): Long = prefs(context).getLong("lockDelayMs", 60_000L)
     fun setLockDelayMs(context: Context, value: Long) = prefs(context).edit().putLong("lockDelayMs", value).apply()

@@ -64,6 +64,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        cz.sucto.android.data.DueNotifications.schedule(this)
         // Obnovená relace po studeném startu je zamčená; po otočení obrazovky (savedInstanceState) se nezamyká znovu.
         if (savedInstanceState == null && auth.state.value.signedIn && AppLockViewModel.isAvailable(this)) lock.lock()
         enableEdgeToEdge()

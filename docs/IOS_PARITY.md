@@ -7,7 +7,7 @@ Toto je mapa zdrojového kódu, nikoli potvrzení shody při běhu. iOS změny s
 | --- | --- | --- |
 | Přihlášení | POST sessions/create, email/password, authentication_token | První implementace, neověřeno |
 | Firmy | GET companies, výběr aktivní firmy | Načtení a výběr firmy, změna firmy z menu |
-| Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury; srovnání/aging/forecast/partneři/zpráva zbývají |
+| Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury, stáří po splatnosti, prognóza na 30 dní s nejbližšími splatnostmi (klepnutím detail), pageru po měnách; srovnání s minulým rokem, žebříček partnerů a zpráva zbývají |
 | Faktury | Vydané/přijaté, stránkování, hledání, rychlé a podrobné filtry | Oba směry, hledání, rychlé i podrobné filtry a další stránky; neověřeno za běhu |
 | Detail faktury | stavy, položky, partner, účet, data, kopírování, platební QR | Čtení detailu, stav, datumy, VS, účet, položky a QR včetně sdílení; kopírování jednotlivých polí zbývá |
 | Akce faktury | úhrada vydané faktury, e-mail, ruční upomínka | Úhrada (s potvrzením, GET /pay), odeslání e-mailem (PATCH send_to_email) a upomínka s upravitelným textem implementovány; upomínky jsou ve výchozím stavu vypnuté |
@@ -24,7 +24,7 @@ Toto je mapa zdrojového kódu, nikoli potvrzení shody při běhu. iOS změny s
 | Offline | uložená GET data, datum cache, platnost 30 dní, šifrování | Šifrovaná cache GET odpovědí (Keystore), platnost 30 dní, vynechává `_cont`, `/new`, `/pay`, štítek „Offline – data z …“ |
 | Zámek | biometrie/kód zařízení, vždy zapnutý (nejde vypnout), studený start, prodleva 0/60/300 s | BiometricPrompt s kódem zařízení jako zálohou, nejde vypnout, prodleva pevně 60 s, jedno automatické ověření na zamčení, skryté okno v přepínači aplikací (FLAG_SECURE); volba prodlevy a zámek po studeném startu čekají na trvalou relaci |
 | Uložené přihlášení | volitelné, zabezpečené, biometrické ověření | Zbývá |
-| Upozornění | splatnosti denně 9:00, ve výchozím stavu neutrální text bez firmy a počtů, podrobnosti jen na výslovné zapnutí | Zbývá; při implementaci převzít neutrální výchozí text a volbu podrobností |
+| Upozornění | splatnosti denně 9:00, ve výchozím stavu neutrální text bez firmy a počtů, podrobnosti jen na výslovné zapnutí | WorkManager denně kolem 9:00, úloha si sama načte nezaplacené faktury naposledy otevřené firmy; výchozí neutrální text, podrobnosti na zapnutí a na zamčené obrazovce vždy jen veřejná neutrální verze; klepnutí otevře aplikaci (bez odkazu na seznam po splatnosti) |
 | Widget | snapshot splatností firmy, obnova po otevření, soukromí (jména i částky skryté na zamčené obrazovce) | Zbývá, Android AppWidget; skrývat jména i částky na zamčeném zařízení |
 | Nastavení | zámek, rychlé přihlášení, upozornění, upomínky, widget, cache, verze | Prodleva zámku, upomínky (zapnutí a text), verze, odhlášení; upozornění, widget a rychlé přihlášení zbývají |
 

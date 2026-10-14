@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cz.sucto.android.data.ApiException
+import cz.sucto.android.data.AppSettings
 import cz.sucto.android.data.Company
 import cz.sucto.android.data.ResponseCache
 import cz.sucto.android.data.SessionStore
@@ -95,6 +96,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun selectCompany(company: Company?) {
         if (company?.id != state.value.selectedCompany?.id) companyStore.clear()
         store.lastCompanyId = company?.id
+        AppSettings.setLastCompanyName(getApplication(), company?.name)
         mutableState.update { it.copy(selectedCompany = company) }
     }
     fun dashboardFactory(companyId: Int): DashboardViewModel.Factory {
