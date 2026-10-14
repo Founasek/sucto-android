@@ -39,6 +39,8 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import cz.sucto.android.ui.AppLockViewModel
 import cz.sucto.android.ui.CompanyLogo
+import cz.sucto.android.ui.SoftButton
+import cz.sucto.android.ui.SuctoCard
 import cz.sucto.android.ui.CompanyViewModel
 import cz.sucto.android.ui.PartnersViewModel
 import cz.sucto.android.ui.LockScreen
@@ -146,32 +148,36 @@ private fun LoginScreen(state: AuthState, onLogin: (String, String) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompaniesScreen(state: AuthState, onRetry: () -> Unit, onLogout: () -> Unit, onSelect: (Company) -> Unit) {
-    Scaffold(topBar = {
-        TopAppBar(title = { Text(stringResource(R.string.companies)) }, actions = {
-            TextButton(onClick = onLogout, enabled = !state.loading) { Text(stringResource(R.string.logout)) }
-        })
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
+        TopAppBar(title = { Text(stringResource(R.string.companies), fontWeight = FontWeight.Bold) },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background,
+                scrolledContainerColor = MaterialTheme.colorScheme.background),
+            actions = { TextButton(onClick = onLogout, enabled = !state.loading) { Text(stringResource(R.string.logout)) } })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-            state.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-                Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            if (state.loading) Row(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalArrangement = Arrangement.Center) {
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+            }
+            state.error?.let { error ->
+                SuctoCard {
+                    Text(error, color = MaterialTheme.colorScheme.error)
+                    SoftButton(stringResource(R.string.retry), onRetry)
+                }
             }
             if (!state.loading && state.error == null && state.companies.isEmpty()) {
-                Text(stringResource(R.string.no_companies))
+                Text(stringResource(R.string.no_companies), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             state.companies.forEach { company ->
-
-                Card(onClick = { onSelect(company) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                SuctoCard(onClick = { onSelect(company) }) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         CompanyLogo(company)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(company.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            Text(stringResource(R.string.company_ic, company.ic), style = MaterialTheme.typography.bodyMedium)
+                            Text(company.name, style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.company_ic, company.ic), style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (company.isTaxable) Text(stringResource(R.string.taxable), color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.labelSmall)
+                                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

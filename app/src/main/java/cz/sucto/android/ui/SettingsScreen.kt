@@ -22,7 +22,7 @@ fun SettingsScreen(onLogout: () -> Unit, modifier: Modifier) {
     var delay by remember { mutableLongStateOf(AppSettings.lockDelayMs(context)) }
     var reminders by remember { mutableStateOf(AppSettings.remindersEnabled(context)) }
     var template by remember { mutableStateOf(AppSettings.reminderTemplate(context)) }
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(modifier, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Header("Zabezpečení") }
         item {
             Panel {
@@ -64,19 +64,14 @@ fun SettingsScreen(onLogout: () -> Unit, modifier: Modifier) {
         }
         item { Header("O aplikaci") }
         item { Panel { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Verze"); Text(version(context)) } } }
-        item { OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Odhlásit se") } }
+        item { SoftButton("Odhlásit se", onLogout, destructive = true) }
     }
 }
 
 private fun version(context: Context): String = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "—"
 
 @Composable
-private fun Header(title: String) = Text(title.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
-    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp))
+private fun Header(title: String) = SectionLabel(title)
 
 @Composable
-private fun Panel(content: @Composable ColumnScope.() -> Unit) = Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
-    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
-}
+private fun Panel(content: @Composable ColumnScope.() -> Unit) = SuctoCard { content() }

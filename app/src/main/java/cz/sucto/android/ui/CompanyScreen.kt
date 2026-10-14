@@ -3,45 +3,51 @@ package cz.sucto.android.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cz.sucto.android.data.*
 
-/** Záložka Firma: údaje o firmě, účty a přepnutí firmy. Dvojí klepnutí na záložku otevře přepínač (řeší DashboardScreen). */
+/** Záložka Firma: údaje o firmě, účty, partneři a přepnutí firmy. Dvojí klepnutí na záložku otevře přepínač (řeší DashboardScreen). */
 @Composable
 fun CompanyScreen(company: Company, state: CompanyState, onRetry: () -> Unit, onAccount: (CompanyAccount?) -> Unit,
     onSwitch: () -> Unit, onPartners: () -> Unit, modifier: Modifier) {
     val account = state.selectedAccount
     if (account != null) { AccountDetail(account, modifier); return }
     val detail = state.detail
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(modifier, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 CompanyLogo(company, 84.dp)
-                Text(detail?.name ?: company.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center)
+                Text(detail?.name ?: company.name, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
                 if (detail?.isTaxable ?: company.isTaxable) Text("Plátce DPH", color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge)
+                    style = MaterialTheme.typography.labelLarge, modifier = Modifier.clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = .14f)).padding(horizontal = 12.dp, vertical = 4.dp))
             }
         }
         if (state.loading && detail == null) item { Loading("Načítám údaje o firmě…") }
         state.error?.let { error -> if (detail == null) item { ErrorCard(error, onRetry) } }
-        if (detail != null) {
-            item { SectionHeader("Údaje o firmě") }
-            item {
-                SectionCard {
+        if (detail != null) item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel("Údaje o firmě")
+                SuctoCard {
                     CopyRow("IČO", detail.ic)
                     CopyRow("E-mail", detail.email)
                     if (detail.addressLines.isNotEmpty()) InfoRow("Adresa", detail.addressLines.joinToString("\n"))
@@ -50,52 +56,46 @@ fun CompanyScreen(company: Company, state: CompanyState, onRetry: () -> Unit, on
             }
         }
         if (state.accounts.isNotEmpty()) {
-            item { SectionHeader("Účty") }
-            items(state.accounts, key = { it.id }) { account -> AccountCard(account) { onAccount(account) } }
-        }
-        item { SectionHeader("Partneři") }
-        item {
-            Card(onClick = onPartners, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Odběratelé a dodavatelé", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Seznam, vyhledávání a přidání partnera", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            item { SectionLabel("Účty") }
+            items(state.accounts, key = { it.id }) { account ->
+                NavRow(if (account.isCash) Icons.Default.AccountBox else Icons.Default.Home, account.name,
+                    if (account.isCash) "Hotovost" else account.accountNumber.orEmpty(), { onAccount(account) }, dimmed = account.isDeactivated)
             }
         }
         item {
-            OutlinedButton(onClick = onSwitch, modifier = Modifier.fillMaxWidth()) { Text("Přepnout firmu") }
-            Spacer(Modifier.height(8.dp))
-            Text("Firmu přepnete také dvojím klepnutím na záložku Firma.", style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel("Partneři")
+                NavRow(Icons.Default.Person, "Odběratelé a dodavatelé", "Seznam, vyhledávání a přidání partnera", onPartners)
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SoftButton("Přepnout firmu", onSwitch)
+                Text("Firmu přepnete také dvojím klepnutím na záložku Firma.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 }
 
+/** Karta s ikonou, dvěma řádky textu a šipkou; klepnutím se otevře cíl. */
 @Composable
-private fun SectionHeader(title: String) {
-    Text(title.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
-}
-
-@Composable
-private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, Modifier.weight(1f), textAlign = TextAlign.End)
+internal fun NavRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit, dimmed: Boolean = false) {
+    SuctoCard(onClick = onClick) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            IconBadge(icon)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = if (dimmed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
 /** Řádek, jehož hodnotu lze klepnutím zkopírovat do schránky. */
 @Composable
-private fun CopyRow(label: String, value: String?) {
+internal fun CopyRow(label: String, value: String?) {
     if (value.isNullOrBlank()) return
     val context = LocalContext.current
     var copied by remember { mutableStateOf(false) }
@@ -104,32 +104,24 @@ private fun CopyRow(label: String, value: String?) {
         copied = true
     }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(if (copied) "Zkopírováno" else value, Modifier.weight(1f), textAlign = TextAlign.End)
-    }
-}
-
-@Composable
-private fun AccountCard(account: CompanyAccount, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(account.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(if (account.isCash) "Hotovost" else account.accountNumber.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (account.isDeactivated) Text("Neaktivní", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-        }
+        Text(if (copied) "Zkopírováno" else value, Modifier.weight(1.2f), textAlign = TextAlign.End,
+            color = if (copied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
     }
 }
 
 @Composable
 private fun AccountDetail(account: CompanyAccount, modifier: Modifier) {
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text(account.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        if (!account.isCash) {
-            item { SectionHeader("Bankovní údaje") }
-            item {
-                SectionCard {
+    LazyColumn(modifier, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            HeroCard {
+                Text(account.name, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(if (account.isCash) "Hotovost" else account.accountNumber.orEmpty(), color = androidx.compose.ui.graphics.Color.White.copy(alpha = .8f))
+            }
+        }
+        if (!account.isCash) item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel("Bankovní údaje")
+                SuctoCard {
                     CopyRow("Číslo účtu", account.accountNumber)
                     CopyRow("IBAN", account.iban)
                     CopyRow("SWIFT", account.swift)
@@ -137,14 +129,16 @@ private fun AccountDetail(account: CompanyAccount, modifier: Modifier) {
                 }
             }
         }
-        item { SectionHeader("Parametry") }
         item {
-            SectionCard {
-                account.prefix?.takeIf { it.isNotBlank() }?.let { InfoRow("Prefix", it) }
-                InfoRow("Počáteční zůstatek", account.openingBalance ?: "-")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel("Parametry")
+                SuctoCard {
+                    account.prefix?.takeIf { it.isNotBlank() }?.let { InfoRow("Prefix", it) }
+                    InfoRow("Počáteční zůstatek", account.openingBalance ?: "-")
+                    if (account.isDeactivated) Text("Účet je deaktivován", color = MaterialTheme.colorScheme.error)
+                }
             }
         }
-        if (account.isDeactivated) item { Text("Účet je deaktivován", color = MaterialTheme.colorScheme.error) }
     }
 }
 
@@ -152,20 +146,19 @@ private fun AccountDetail(account: CompanyAccount, modifier: Modifier) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompanySwitcherSheet(companies: List<Company>, current: Company, onSelect: (Company) -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Přepnout firmu", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.background) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Přepnout firmu", style = MaterialTheme.typography.titleLarge)
             companies.forEach { company ->
                 val selected = company.id == current.id
-                Card(onClick = { if (!selected) onSelect(company) else onDismiss() }, modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CompanyLogo(company, 40.dp)
+                SuctoCard(onClick = { if (!selected) onSelect(company) else onDismiss() }) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        CompanyLogo(company, 44.dp)
                         Column(Modifier.weight(1f)) {
-                            Text(company.name, fontWeight = FontWeight.SemiBold)
+                            Text(company.name, style = MaterialTheme.typography.titleMedium)
                             Text("IČ ${company.ic}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
-                        if (selected) Text("Aktuální", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                        if (selected) Text("Aktuální", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
