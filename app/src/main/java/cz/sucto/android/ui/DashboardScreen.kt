@@ -15,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import cz.sucto.android.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -145,11 +147,12 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
                     NavigationBarItem(selected = tab == item && !settingsOpen,
                         onClick = { settingsOpen = false; if (item == DashboardTab.Company && tab == item) switcher = true else tab = item },
                         icon = {
-                            Icon(when (item) {
-                                DashboardTab.Overview -> Icons.Default.Home
-                                DashboardTab.Company -> Icons.Default.AccountBox
-                                else -> Icons.Default.List
-                            }, contentDescription = null)
+                            Icon(painterResource(when (item) {
+                                DashboardTab.Overview -> R.drawable.ic_tab_overview
+                                DashboardTab.Invoices -> R.drawable.ic_tab_invoices
+                                DashboardTab.Cash -> R.drawable.ic_tab_cash
+                                DashboardTab.Company -> R.drawable.ic_tab_company
+                            }), contentDescription = null)
                         },
                         label = { Text(item.title) },
                         colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = .16f),

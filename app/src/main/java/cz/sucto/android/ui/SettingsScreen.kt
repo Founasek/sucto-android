@@ -46,6 +46,20 @@ fun SettingsScreen(onLogout: () -> Unit, modifier: Modifier) {
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        item {
+            Panel {
+                val credentials = remember { cz.sucto.android.data.CredentialStore(context) }
+                var saved by remember { mutableStateOf(credentials.hasSavedLogin) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Rychlé přihlášení")
+                    if (saved) TextButton(onClick = { credentials.clear(); saved = false }) {
+                        Text("Zapomenout", color = MaterialTheme.colorScheme.error)
+                    } else Text("Nastaví se při přihlášení", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("Biometrické přihlášení ukládá e-mail a heslo zašifrované jen do zabezpečeného úložiště tohoto zařízení; použít je půjde jen po ověření biometrií.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         item { Header("Upomínky") }
         item {
             Panel {

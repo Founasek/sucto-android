@@ -84,7 +84,7 @@ private fun Modifier.clickableRow(onClick: () -> Unit): Modifier = this.then(Mod
 
 /** Jedna měna = jedna stránka; u jedné měny bez pageru a bez kapslí. */
 @Composable
-private fun CurrencyPages(currencies: List<String>, page: @Composable (Int) -> Unit) {
+internal fun CurrencyPages(currencies: List<String>, page: @Composable (Int) -> Unit) {
     if (currencies.size == 1) { page(0); return }
     val pager = rememberPagerState { currencies.size }
     val scope = rememberCoroutineScope()

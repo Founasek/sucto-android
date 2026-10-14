@@ -62,7 +62,10 @@ internal fun OverviewScreen(state: DashboardState, onYear: (Int) -> Unit, onRetr
                     }
                 }
             }
-            overview.sections.forEach { section -> item(key = "chart-${section.currency}") { MonthlyChart(section, overview.fromInvoices) } }
+            // Více měn: grafy po měsících jsou v posuvném pageru s kapslemi měn (česká koruna první), ne pod sebou.
+            item(key = "charts") {
+                CurrencyPages(overview.sections.map { it.currency }) { index -> MonthlyChart(overview.sections[index], overview.fromInvoices) }
+            }
         }
         state.forecast?.takeIf { !it.isEmpty }?.let { forecast -> item(key = "forecast") { ForecastCard(forecast, onOpenDue) } }
         state.aging?.takeIf { !it.isEmpty }?.let { aging -> item(key = "aging") { AgingCard(aging) } }

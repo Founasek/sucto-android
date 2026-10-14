@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import cz.sucto.android.data.ApiException
 import cz.sucto.android.data.AppSettings
 import cz.sucto.android.data.Company
+import cz.sucto.android.data.CredentialStore
 import cz.sucto.android.data.ResponseCache
 import cz.sucto.android.data.SessionStore
 import cz.sucto.android.data.SuctoApi
@@ -26,11 +27,16 @@ data class AuthState(
     val loading: Boolean = false,
     val companies: List<Company> = emptyList(),
     val error: String? = null,
+    /** Po ručním přihlášení čeká nabídka „Uložit přihlášení?“ pro biometrické přihlášení. */
+    val offerSave: Boolean = false,
 )
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val cache = ResponseCache(application)
     private val api = SuctoApi(cache)
     private val store = SessionStore(application)
+    val credentials = CredentialStore(application)
+    /** E-mail a heslo z právě proběhlého ručního přihlášení, dokud uživatel neodpoví na nabídku uložení. Jen v paměti. */
+    private var pendingLogin: CredentialStore.Credentials? = null
     /** Data z cache při výpadku připojení (čas uložení), jinak `null`. */
     val cachedDataDate = api.cachedDataDate
     private val companyStore = ViewModelStore()
@@ -49,14 +55,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun login(email: String, password: String) {
+    fun login(email: String, password: String, manual: Boolean = true) {
         if (state.value.loading || email.isBlank() || password.isEmpty()) return
         viewModelScope.launch {
             mutableState.value = AuthState(loading = true)
             try {
                 token = api.login(email.trim(), password)
                 token?.let { runCatching { store.saveToken(it) } }
-                mutableState.value = AuthState(signedIn = true, sessionId = System.nanoTime(), loading = true)
+                pendingLogin = if (manual && credentials.canOffer) CredentialStore.Credentials(email.trim(), password) else null
+                mutableState.value = AuthState(signedIn = true, sessionId = System.nanoTime(), loading = true, offerSave = pendingLogin != null)
                 loadCompanies()
             } catch (error: CancellationException) {
                 throw error
@@ -64,6 +71,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 mutableState.update { it.copy(loading = false, error = message(error)) }
             }
         }
+    }
+
+    /** Čekající údaje z ručního přihlášení; MainActivity je po biometrickém ověření uloží. */
+    fun pendingCredentials(): CredentialStore.Credentials? = pendingLogin
+    /** Konec nabídky uložení (uloženo / „Teď ne“ / „Nikdy“). */
+    fun dismissOffer(never: Boolean = false) {
+        pendingLogin = null
+        if (never) credentials.offerDeclined = true
+        mutableState.update { it.copy(offerSave = false) }
     }
 
     fun refreshCompanies() {

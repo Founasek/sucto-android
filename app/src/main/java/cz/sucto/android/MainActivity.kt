@@ -38,6 +38,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import cz.sucto.android.ui.AppLockViewModel
+import cz.sucto.android.ui.authenticateWithCipher
 import cz.sucto.android.ui.CompanyLogo
 import cz.sucto.android.ui.SoftButton
 import cz.sucto.android.ui.SuctoCard
@@ -62,6 +63,23 @@ class MainActivity : FragmentActivity() {
     override fun onStop() { lock.onStop(); super.onStop() }
     override fun onStart() { super.onStart(); lock.onStart(this) }
 
+    /** Biometrické přihlášení uloženým e-mailem a heslem; spouští se jen klepnutím na tlačítko. */
+    private fun loginWithSaved() {
+        val cipher = auth.credentials.decryptCipher() ?: return
+        authenticateWithCipher(cipher, "Přihlášení do sÚčta", { unlocked ->
+            auth.credentials.load(unlocked)?.let { auth.login(it.email, it.password, manual = false) }
+        }, { })
+    }
+
+    /** Uloží právě zadané přihlášení po biometrickém ověření. */
+    private fun saveLogin() {
+        val pending = auth.pendingCredentials() ?: return
+        authenticateWithCipher(auth.credentials.encryptCipher(), "Uložení přihlášení", { cipher ->
+            auth.credentials.save(cipher, pending.email, pending.password)
+            auth.dismissOffer()
+        }, { auth.dismissOffer() })
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         cz.sucto.android.data.DueNotifications.schedule(this)
@@ -70,6 +88,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         setContent {
             val model = auth
+            var credentialsVersion by remember { mutableIntStateOf(0) }
             val state by model.state.collectAsStateWithLifecycle()
             SuctoTheme(dark = if (state.signedIn) androidx.compose.foundation.isSystemInDarkTheme() else true) {
                 val company = state.selectedCompany
@@ -84,7 +103,12 @@ class MainActivity : FragmentActivity() {
                     DashboardScreen(company, state.companies, dashboard, cash, profile, partners, offlineSince = offlineSince, onSwitchCompany = model::selectCompany,
                         onCompanies = { model.selectCompany(null) }, onLogout = model::logout)
                 } else if (state.signedIn) CompaniesScreen(state, model::refreshCompanies, model::logout, model::selectCompany)
-                else LoginScreen(state, model::login)
+                else LoginScreen(state, hasSaved = remember(state.signedIn, credentialsVersion) { model.credentials.hasSavedLogin }, onLogin = { email, password -> model.login(email, password) },
+                    onBiometric = { loginWithSaved() }, onForget = { model.credentials.clear(); credentialsVersion++ })
+                if (state.signedIn && state.offerSave) SaveLoginDialog(
+                    onSave = { saveLogin() },
+                    onLater = { model.dismissOffer() },
+                    onNever = { model.dismissOffer(never = true) })
                 // Zámek překrývá celou aplikaci, ale jen po přihlášení (relace je zatím jen v paměti).
                 val lockState by lock.state.collectAsStateWithLifecycle()
                 if (state.signedIn && lockState.locked) LockScreen(lock, this@MainActivity)
@@ -94,10 +118,11 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-private fun LoginScreen(state: AuthState, onLogin: (String, String) -> Unit) {
+private fun LoginScreen(state: AuthState, hasSaved: Boolean, onLogin: (String, String) -> Unit, onBiometric: () -> Unit, onForget: () -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }
     // Password must not be stored in the saved instance state.
     var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     val submit = { onLogin(email, password) }
     BoxWithConstraints(
         Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Ink, InkSoft, Color(0xFF246B3B))))
@@ -130,7 +155,14 @@ private fun LoginScreen(state: AuthState, onLogin: (String, String) -> Unit) {
                     OutlinedTextField(password, { password = it }, modifier = Modifier.fillMaxWidth(),
                         enabled = !state.loading, singleLine = true, label = { Text(stringResource(R.string.password)) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        shape = RoundedCornerShape(14.dp), visualTransformation = PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showPassword = !showPassword }) {
+                                Icon(painterResource(if (showPassword) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
+                                    contentDescription = if (showPassword) "Skrýt heslo" else "Zobrazit heslo")
+                            }
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(onGo = { submit() }))
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -139,6 +171,15 @@ private fun LoginScreen(state: AuthState, onLogin: (String, String) -> Unit) {
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F9E55), contentColor = Color.White)) {
                         if (state.loading) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                         else Text(stringResource(R.string.login), fontWeight = FontWeight.SemiBold)
+                    }
+                    if (hasSaved) {
+                        OutlinedButton(onClick = onBiometric, enabled = !state.loading, modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
+                            Text("Přihlásit se biometrií", fontWeight = FontWeight.SemiBold)
+                        }
+                        TextButton(onClick = onForget, modifier = Modifier.fillMaxWidth()) {
+                            Text("Zapomenout uložené přihlášení", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
             }
@@ -185,4 +226,13 @@ private fun CompaniesScreen(state: AuthState, onRetry: () -> Unit, onLogout: () 
             }
         }
     }
+}
+
+/** Nabídka uložení přihlášení po úspěšném ručním přihlášení (jen s nastavenou biometrií). */
+@Composable
+private fun SaveLoginDialog(onSave: () -> Unit, onLater: () -> Unit, onNever: () -> Unit) {
+    AlertDialog(onDismissRequest = onLater, title = { Text("Uložit přihlášení?") },
+        text = { Text("Příště se přihlásíte biometrií. E-mail a heslo se uloží zašifrované jen do zabezpečeného úložiště tohoto zařízení a použít je půjde jen po ověření otiskem nebo obličejem.") },
+        confirmButton = { TextButton(onClick = onSave) { Text("Uložit") } },
+        dismissButton = { Row { TextButton(onClick = onNever) { Text("Nikdy") }; TextButton(onClick = onLater) { Text("Teď ne") } } })
 }

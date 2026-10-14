@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
+import cz.sucto.android.R
 import androidx.compose.ui.unit.dp
 import cz.sucto.android.data.Company
 import cz.sucto.android.ui.theme.BrandGradient
@@ -52,7 +54,7 @@ fun CompanyLogo(company: Company?, size: Dp = 52.dp) {
             }
         } else {
             Box(Modifier.size(size).background(Brush.linearGradient(BrandGradient)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Home, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.5f))
+                Icon(painterResource(R.drawable.ic_tab_company), contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.5f))
             }
         }
     }

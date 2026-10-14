@@ -135,3 +135,24 @@ fun LockScreen(lock: AppLockViewModel, activity: FragmentActivity) {
         }
     }
 }
+
+/**
+ * Biometrické ověření s kryptografickým objektem (uložené přihlášení). Bez náhradního kódu zařízení: klíč smí použít jen biometrie.
+ * `onSuccess` dostane cipher odemčený ověřením; zrušení uživatelem nehlásí chybu (`onFailure(null)`).
+ */
+fun FragmentActivity.authenticateWithCipher(cipher: javax.crypto.Cipher, title: String, onSuccess: (javax.crypto.Cipher) -> Unit,
+    onFailure: (String?) -> Unit) {
+    val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
+        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+            result.cryptoObject?.cipher?.let(onSuccess) ?: onFailure("Ověření se nezdařilo.")
+        }
+        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+            val cancelled = errorCode == BiometricPrompt.ERROR_USER_CANCELED || errorCode == BiometricPrompt.ERROR_CANCELED ||
+                errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+            onFailure(if (cancelled) null else "Ověření se nezdařilo.")
+        }
+    })
+    val info = BiometricPrompt.PromptInfo.Builder().setTitle(title).setNegativeButtonText("Zrušit")
+        .setAllowedAuthenticators(BIOMETRIC_STRONG).build()
+    prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
+}
