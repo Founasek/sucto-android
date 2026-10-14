@@ -187,3 +187,39 @@ private fun AgingCell(amounts: AgingSummary.Amounts, currency: String, modifier:
         } else Text("—", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/** Největší odběratelé (z vydaných faktur) a dodavatelé (z přijatých) roku jako dvě stránky pageru; uvnitř po měnách. */
+@Composable
+internal fun TopPartiesCard(sections: List<OverviewSection>) {
+    val sides = listOf("Odběratelé" to true, "Dodavatelé" to false).filter { (_, customers) ->
+        sections.any { (if (customers) it.topCustomers else it.topSuppliers).isNotEmpty() }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel("Největší partneři")
+        SuctoCard {
+            CurrencyPages(sides.map { it.first }) { index -> TopPartiesPage(sections, sides[index].second) }
+            Text("Podle základu faktur bez DPH za zvolený rok.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun TopPartiesPage(sections: List<OverviewSection>, customers: Boolean) {
+    val color = if (customers) Brand else Amber
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        sections.forEach { section ->
+            val list = if (customers) section.topCustomers else section.topSuppliers
+            if (list.isNotEmpty()) {
+                if (sections.size > 1) Text(section.currency, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                list.forEachIndexed { index, party ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("${index + 1}.", Modifier.width(24.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(party.name, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                        Text(moneyWhole(party.amount, section.currency), style = MaterialTheme.typography.bodyMedium.merge(MoneyStyle), color = color, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}

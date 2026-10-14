@@ -103,7 +103,10 @@ fun parseApiDate(value: String?): LocalDate? {
 fun dateLabel(value: String?): String = parseApiDate(value)?.format(DateTimeFormatter.ofPattern("d. M. yyyy")) ?: value ?: "—"
 data class MonthlyFigure(val month: Int, val revenue: BigDecimal, val cost: BigDecimal)
 data class OverviewSection(val currency: String, val revenue: BigDecimal, val cost: BigDecimal,
-    val result: BigDecimal, val months: List<MonthlyFigure>)
+    val result: BigDecimal, val months: List<MonthlyFigure>,
+    val topCustomers: List<RankedParty> = emptyList(), val topSuppliers: List<RankedParty> = emptyList())
+/** Protistrana a součet základu faktur za rok (v jedné měně). */
+data class RankedParty(val name: String, val amount: BigDecimal)
 data class Overview(val sections: List<OverviewSection>, val fromInvoices: Boolean)
 internal data class AccountingValue(val value: BigDecimal, val currency: String)
 internal fun accountingValue(text: String?): AccountingValue? {

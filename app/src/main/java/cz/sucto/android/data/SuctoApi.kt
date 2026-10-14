@@ -195,6 +195,12 @@ class SuctoApi(private val cache: ResponseCache? = null) {
             }
         }
     }
+    /** Nejvyšší součty základu podle protistrany v dané měně, nejvýše pět. */
+    private fun ranking(invoices: List<Invoice>, currency: String): List<RankedParty> =
+        invoices.filter { it.currency == currency }.groupBy { it.partner?.takeIf { name -> name.isNotBlank() } ?: "Neuvedeno" }
+            .map { (name, list) -> RankedParty(name, list.fold(java.math.BigDecimal.ZERO) { acc, invoice -> acc + (invoice.base ?: java.math.BigDecimal.ZERO) }) }
+            .filter { it.amount.signum() != 0 }.sortedWith(compareByDescending<RankedParty> { it.amount }.thenBy { it.name }).take(5)
+
     suspend fun overview(token: String, companyId: Int, year: Int): Overview {
         val zero = java.math.BigDecimal.ZERO
         try {
@@ -245,7 +251,8 @@ class SuctoApi(private val cache: ResponseCache? = null) {
             val months = (1..12).map { MonthlyFigure(it, sum(issued, it), sum(received, it)) }
             val revenue = months.fold(zero) { acc, m -> acc + m.revenue }
             val cost = months.fold(zero) { acc, m -> acc + m.cost }
-            OverviewSection(currency, revenue, cost, revenue - cost, months)
+            OverviewSection(currency, revenue, cost, revenue - cost, months,
+                ranking(issued, currency), ranking(received, currency))
         }.filter { it.months.any { m -> m.revenue.signum() != 0 || m.cost.signum() != 0 } }
         return Overview(sections, true)
     }

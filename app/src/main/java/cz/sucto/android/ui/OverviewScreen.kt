@@ -67,6 +67,11 @@ internal fun OverviewScreen(state: DashboardState, onYear: (Int) -> Unit, onRetr
                 CurrencyPages(overview.sections.map { it.currency }) { index -> MonthlyChart(overview.sections[index], overview.fromInvoices) }
             }
         }
+        // Největší partneři jsou jen v přehledu z faktur (účetní deník žebříček nemá); na konci stránky jako doplněk.
+        if (overview != null && overview.fromInvoices) {
+            val sections = overview.sections
+            if (sections.any { it.topCustomers.isNotEmpty() || it.topSuppliers.isNotEmpty() }) item(key = "parties") { TopPartiesCard(sections) }
+        }
         state.forecast?.takeIf { !it.isEmpty }?.let { forecast -> item(key = "forecast") { ForecastCard(forecast, onOpenDue) } }
         state.aging?.takeIf { !it.isEmpty }?.let { aging -> item(key = "aging") { AgingCard(aging) } }
     }
