@@ -7,7 +7,7 @@ Toto je mapa zdrojového kódu, nikoli potvrzení shody při běhu. iOS změny s
 | --- | --- | --- |
 | Přihlášení | POST sessions/create, email/password, authentication_token | První implementace, neověřeno |
 | Firmy | GET companies, výběr aktivní firmy | Načtení a výběr firmy, změna firmy z menu |
-| Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury, stáří po splatnosti, prognóza na 30 dní s nejbližšími splatnostmi (klepnutím detail), pageru po měnách; srovnání s minulým rokem, žebříček partnerů a zpráva zbývají |
+| Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury, stáří po splatnosti, prognóza na 30 dní s nejbližšími splatnostmi (klepnutím detail), pageru po měnách; žebříček největších odběratelů a dodavatelů (jen v přehledu z faktur, jako v iOS); srovnání s minulým rokem a systémová zpráva zbývají |
 | Faktury | Vydané/přijaté, stránkování, hledání, rychlé a podrobné filtry | Oba směry, hledání, rychlé i podrobné filtry a další stránky; neověřeno za běhu |
 | Detail faktury | stavy, položky, partner, účet, data, kopírování, platební QR | Čtení detailu, stav, datumy, VS, účet, položky a QR včetně sdílení; kopírování jednotlivých polí zbývá |
 | Akce faktury | úhrada vydané faktury, e-mail, ruční upomínka | Úhrada (s potvrzením, GET /pay), odeslání e-mailem (PATCH send_to_email) a upomínka s upravitelným textem implementovány; upomínky jsou ve výchozím stavu vypnuté |
