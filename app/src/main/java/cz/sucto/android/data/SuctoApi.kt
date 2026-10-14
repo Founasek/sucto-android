@@ -41,7 +41,7 @@ class SuctoApi(private val cache: ResponseCache? = null) {
         val array = JSONArray(request("companies", token))
         return List(array.length()) { index ->
             val item = array.getJSONObject(index)
-            Company(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"), item.getInt("country_id"))
+            Company(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"), item.getInt("country_id"), item.text("logo"))
         }
     }
 
@@ -272,7 +272,7 @@ class SuctoApi(private val cache: ResponseCache? = null) {
 
     companion object { const val BASE_URL = "https://www.sucto.cz/api/" }
 }
-data class Company(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val countryId: Int)
+data class Company(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val countryId: Int, val logo: String? = null)
 data class CompanyDetail(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val email: String?, val addressLines: List<String>)
 data class CompanyAccount(val id: Int, val name: String, val isCash: Boolean, val isDeactivated: Boolean, val prefix: String?,
     val openingBalance: String?, val account: String?, val bankCode: String?, val iban: String?, val swift: String?, val bankName: String?) {

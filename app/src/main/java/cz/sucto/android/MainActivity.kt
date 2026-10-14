@@ -38,6 +38,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import cz.sucto.android.ui.AppLockViewModel
+import cz.sucto.android.ui.CompanyLogo
 import cz.sucto.android.ui.CompanyViewModel
 import cz.sucto.android.ui.PartnersViewModel
 import cz.sucto.android.ui.LockScreen
@@ -164,11 +165,14 @@ private fun CompaniesScreen(state: AuthState, onRetry: () -> Unit, onLogout: () 
 
                 Card(onClick = { onSelect(company) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(company.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.company_ic, company.ic), style = MaterialTheme.typography.bodyMedium)
-                        if (company.isTaxable) Text(stringResource(R.string.taxable), color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelSmall)
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        CompanyLogo(company)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(company.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.company_ic, company.ic), style = MaterialTheme.typography.bodyMedium)
+                            if (company.isTaxable) Text(stringResource(R.string.taxable), color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }

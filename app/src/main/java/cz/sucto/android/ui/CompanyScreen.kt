@@ -29,6 +29,7 @@ fun CompanyScreen(company: Company, state: CompanyState, onRetry: () -> Unit, on
         item {
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                CompanyLogo(company, 84.dp)
                 Text(detail?.name ?: company.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center)
                 if (detail?.isTaxable ?: company.isTaxable) Text("Plátce DPH", color = MaterialTheme.colorScheme.primary,
@@ -159,6 +160,7 @@ fun CompanySwitcherSheet(companies: List<Company>, current: Company, onSelect: (
                 Card(onClick = { if (!selected) onSelect(company) else onDismiss() }, modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CompanyLogo(company, 40.dp)
                         Column(Modifier.weight(1f)) {
                             Text(company.name, fontWeight = FontWeight.SemiBold)
                             Text("IČ ${company.ic}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
