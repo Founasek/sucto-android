@@ -36,7 +36,7 @@ import kotlin.math.max
 
 /** Přehled hospodaření: výběr roku, hlavní karta s výsledkem, výnosy a náklady a graf po měsících (u každé měny). */
 @Composable
-internal fun OverviewScreen(state: DashboardState, onYear: (Int) -> Unit, onRetry: () -> Unit, modifier: Modifier) {
+internal fun OverviewScreen(state: DashboardState, onYear: (Int) -> Unit, onRetry: () -> Unit, onOpenDue: (DueItem) -> Unit, modifier: Modifier) {
     val overview = state.overview
     val current = LocalDate.now().year
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -64,6 +64,8 @@ internal fun OverviewScreen(state: DashboardState, onYear: (Int) -> Unit, onRetr
             }
             overview.sections.forEach { section -> item(key = "chart-${section.currency}") { MonthlyChart(section, overview.fromInvoices) } }
         }
+        state.forecast?.takeIf { !it.isEmpty }?.let { forecast -> item(key = "forecast") { ForecastCard(forecast, onOpenDue) } }
+        state.aging?.takeIf { !it.isEmpty }?.let { aging -> item(key = "aging") { AgingCard(aging) } }
     }
 }
 

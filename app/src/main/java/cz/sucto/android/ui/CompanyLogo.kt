@@ -2,6 +2,7 @@ package cz.sucto.android.ui
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -57,14 +58,35 @@ fun CompanyLogo(company: Company?, size: Dp = 52.dp) {
     }
 }
 
+/**
+ * Stáhne logo. Adresa v API není zdokumentovaná, proto se zkouší i relativní cesta (vůči sucto.cz) a odkaz `http` se zvedne na `https`;
+ * přesměrování (např. na úložiště souborů) se sleduje ručně, každý krok musí být HTTPS.
+ */
 private fun loadLogo(address: String): Bitmap? = runCatching {
-    val url = URL(address)
-    if (url.protocol != "https") return null
-    val connection = (url.openConnection() as HttpURLConnection).apply {
-        connectTimeout = 10_000; readTimeout = 10_000; instanceFollowRedirects = false
+    var url = resolve(address) ?: return null
+    repeat(5) {
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000; readTimeout = 10_000; instanceFollowRedirects = false
+            setRequestProperty("Accept", "image/*")
+        }
+        try {
+            val code = connection.responseCode
+            Log.d("CompanyLogo", "${url.host} -> HTTP $code")
+            if (code in 300..399) {
+                url = resolve(connection.getHeaderField("Location"), url) ?: return null
+            } else {
+                if (code !in 200..299 || connection.contentLengthLong > 8_000_000) return null
+                return connection.inputStream.use { BitmapFactory.decodeStream(it) }
+            }
+        } finally { connection.disconnect() }
     }
-    try {
-        if (connection.responseCode !in 200..299 || connection.contentLengthLong > 2_000_000) return null
-        connection.inputStream.use { BitmapFactory.decodeStream(it) }
-    } finally { connection.disconnect() }
+    null
 }.getOrNull()
+
+private fun resolve(address: String?, base: URL = URL("https://www.sucto.cz/")): URL? {
+    if (address.isNullOrBlank()) return null
+    val resolved = runCatching { URL(base, address.trim()) }.getOrNull() ?: return null
+    return if (resolved.protocol == "https") resolved
+    else if (resolved.protocol == "http") runCatching { URL("https", resolved.host, resolved.port.takeIf { it != 80 } ?: -1, resolved.file) }.getOrNull()
+    else null
+}

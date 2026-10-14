@@ -186,7 +186,7 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
                 } else if (inCompany) CompanyScreen(company, profile, companyModel::refresh, companyModel::openAccount, { switcher = true },
                     { partnersOpen = true; partnersModel.start() }, modifier)
                 else if (cash.detail != null || tab == DashboardTab.Cash) CashScreen(cash, cashModel, modifier)
-                else if (tab == DashboardTab.Overview) OverviewScreen(state, model::selectYear, model::refreshOverview, modifier)
+                else if (tab == DashboardTab.Overview) OverviewScreen(state, model::selectYear, model::refreshOverview, model::openDue, modifier)
                 else {
                     val list = if (direction == InvoiceDirection.Outgoing) state.outgoing else state.incoming
                     InvoiceListScreen(list, direction, onDirection = { direction = it }, onSearch = { model.search(direction, it) },

@@ -9,6 +9,7 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Response
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -41,7 +42,7 @@ class SuctoApi(private val cache: ResponseCache? = null) {
         val array = JSONArray(request("companies", token))
         return List(array.length()) { index ->
             val item = array.getJSONObject(index)
-            Company(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"), item.getInt("country_id"), item.text("logo"))
+            Company(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"), item.getInt("country_id"), logoOf(item))
         }
     }
 
@@ -65,6 +66,34 @@ class SuctoApi(private val cache: ResponseCache? = null) {
                 item.optBoolean("is_deactivated"), item.text("prefix"), item.text("opening_balance"),
                 bank?.text("account"), bank?.text("bank_code"), bank?.text("iban"), bank?.text("swift"), bank?.text("bank_name"))
         }
+    }
+
+    /**
+     * Nezaplacené faktury se splatností do [horizon] (a všechny prošlé), vydané i přijaté. API nemá souhrn ani filtr „nezaplaceno“,
+     * proto se pro každý nezaplacený stav (připraveno … částečně uhrazeno) ptáme zvlášť.
+     */
+    suspend fun dueItems(token: String, companyId: Int, horizon: java.time.LocalDate): List<DueItem> = coroutineScope {
+        suspend fun load(direction: InvoiceDirection): List<DueItem> = coroutineScope {
+            val all = UNPAID_STATUSES.map { status -> async {
+                val collected = mutableListOf<Invoice>()
+                for (page in 1..5) {
+                    val query = InvoiceQuery(advanced = InvoiceAdvancedFilter(status = status, dueTo = horizon))
+                    val values = invoices(token, companyId, direction, query.parameters(page))
+                    if (values.isEmpty()) break
+                    collected += values
+                }
+                collected
+            } }.flatMap { it.await() }
+            all.distinctBy { it.id }.mapNotNull { invoice ->
+                val due = parseApiDate(invoice.due) ?: return@mapNotNull null
+                if (invoice.statusId in listOf(1, 8, 10, 11)) return@mapNotNull null
+                DueItem(invoice.id, direction == InvoiceDirection.Incoming, invoice.number, invoice.partner, due,
+                    invoice.remaining?.takeIf { it.signum() > 0 } ?: invoice.total ?: java.math.BigDecimal.ZERO, invoice.currency)
+            }
+        }
+        val outgoing = async { load(InvoiceDirection.Outgoing) }
+        val incoming = async { load(InvoiceDirection.Incoming) }
+        outgoing.await() + incoming.await()
     }
 
     suspend fun invoices(token: String, companyId: Int, direction: InvoiceDirection, params: Map<String, String>): List<Invoice> {
@@ -270,7 +299,16 @@ class SuctoApi(private val cache: ResponseCache? = null) {
         }
     }.getOrNull()
 
-    companion object { const val BASE_URL = "https://www.sucto.cz/api/" }
+    companion object {
+        const val BASE_URL = "https://www.sucto.cz/api/"
+        private val UNPAID_STATUSES = listOf(2, 3, 4, 5, 6, 7)
+    }
+}
+/** Logo bývá text s adresou; kdyby server poslal objekt, vezme se z něj `url`. */
+private fun logoOf(item: JSONObject): String? = when (val value = item.opt("logo")) {
+    is String -> value.takeIf { it.isNotBlank() }
+    is JSONObject -> value.text("url")
+    else -> null
 }
 data class Company(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val countryId: Int, val logo: String? = null)
 data class CompanyDetail(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val email: String?, val addressLines: List<String>)
