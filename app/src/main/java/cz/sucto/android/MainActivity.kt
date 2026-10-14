@@ -76,7 +76,8 @@ class MainActivity : FragmentActivity() {
                     val cash: CashViewModel = viewModel(viewModelStoreOwner = owner, key = "cash-${state.sessionId}-${company.id}", factory = model.cashFactory(company.id))
                     val profile: CompanyViewModel = viewModel(viewModelStoreOwner = owner, key = "company-${state.sessionId}-${company.id}", factory = model.companyFactory(company.id))
                     val partners: PartnersViewModel = viewModel(viewModelStoreOwner = owner, key = "partners-${state.sessionId}-${company.id}", factory = model.partnersFactory(company.id))
-                    DashboardScreen(company, state.companies, dashboard, cash, profile, partners, onSwitchCompany = model::selectCompany,
+                    val offlineSince by model.cachedDataDate.collectAsStateWithLifecycle()
+                    DashboardScreen(company, state.companies, dashboard, cash, profile, partners, offlineSince = offlineSince, onSwitchCompany = model::selectCompany,
                         onCompanies = { model.selectCompany(null) }, onLogout = model::logout)
                 } else if (state.signedIn) CompaniesScreen(state, model::refreshCompanies, model::logout, model::selectCompany)
                 else LoginScreen(state, model::login)

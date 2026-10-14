@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cz.sucto.android.data.ApiException
 import cz.sucto.android.data.Company
+import cz.sucto.android.data.ResponseCache
 import cz.sucto.android.data.SessionStore
 import cz.sucto.android.data.SuctoApi
 import kotlinx.coroutines.CancellationException
@@ -26,8 +27,11 @@ data class AuthState(
     val error: String? = null,
 )
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
-    private val api = SuctoApi()
+    private val cache = ResponseCache(application)
+    private val api = SuctoApi(cache)
     private val store = SessionStore(application)
+    /** Data z cache při výpadku připojení (čas uložení), jinak `null`. */
+    val cachedDataDate = api.cachedDataDate
     private val companyStore = ViewModelStore()
     val companyOwner: ViewModelStoreOwner = object : ViewModelStoreOwner { override val viewModelStore = companyStore }
     override fun onCleared() { companyStore.clear() }
@@ -80,7 +84,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         } catch (error: ApiException) {
             if (error.unauthorized) {
                 token = null
-                store.clear()
+                store.clear(); cache.clear()
                 mutableState.value = AuthState(error = error.message)
             } else mutableState.update { it.copy(loading = false, error = message(error)) }
         } catch (error: Exception) {
@@ -112,14 +116,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private fun expireSession(expectedToken: String) {
         if (token != expectedToken) return
         token = null
-        store.clear()
+        store.clear(); cache.clear()
         companyStore.clear()
         mutableState.value = AuthState(error = "Přihlášení vypršelo. Přihlaste se znovu.")
     }
     fun logout() {
         if (state.value.loading) return
         token = null
-        store.clear()
+        store.clear(); cache.clear()
         companyStore.clear()
         mutableState.value = AuthState()
     }

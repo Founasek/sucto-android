@@ -10,23 +10,23 @@ Toto je mapa zdrojového kódu, nikoli potvrzení shody při běhu. iOS změny s
 | Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury; srovnání/aging/forecast/partneři/zpráva zbývají |
 | Faktury | Vydané/přijaté, stránkování, hledání, rychlé a podrobné filtry | Oba směry, hledání, rychlé i podrobné filtry a další stránky; neověřeno za běhu |
 | Detail faktury | stavy, položky, partner, účet, data, kopírování, platební QR | Čtení detailu, stav, datumy, VS, účet, položky a QR včetně sdílení; kopírování jednotlivých polí zbývá |
-| Akce faktury | úhrada vydané faktury, e-mail, ruční upomínka | Zbývá |
+| Akce faktury | úhrada vydané faktury, e-mail, ruční upomínka | Úhrada (s potvrzením, GET /pay), odeslání e-mailem (PATCH send_to_email) a upomínka s upravitelným textem implementovány; upomínky jsou ve výchozím stavu vypnuté |
 | Nová faktura | oba směry, číselníky, položky, DPH, součty, duplikace | Formulář obou směrů, partneři, číselníky, položky, výpočty, validace a duplikace implementovány; neověřeno za běhu |
 | Úpravy položek | přidání, úprava a mazání řádků existující faktury | Zbývá |
 | Pokladna | příjmové/výdajové, hledání, stránkování, detail, odeslání | Oba směry, hledání, další stránky a základní detail; odesílání zbývá |
-| Partneři | hledání, detail, obratové grafy, formulář, úprava/mazání, ARES | Zbývá (v iOS je vstup do partnerů v záložce Firma, po implementaci stejně i zde) |
+| Partneři | hledání, detail, obratové grafy, formulář, úprava/mazání, ARES | Seznam s hledáním, detail, přidání z ARES a smazání (vstup ze záložky Firma); obratové grafy a ruční formulář/úprava zbývají |
 | Firma | záložka Firma: údaje (GET companies/{id}), účty, partneři, přepnutí firmy (tlačítko, opakované klepnutí na záložku) | Údaje, účty a přepnutí firmy (tlačítko i opakované klepnutí) implementovány; partneři zbývají; DIČ API nevrací |
 | Účty | seznam, detail, měna | Seznam a detail účtů v záložce Firma (kopírování čísla účtu, IBAN, SWIFT); měna zůstatku zbývá |
-| Export | CSV aktuálního filtru, Pohoda XML jednotlivě/období a sdílení | Zbývá |
+| Export | CSV aktuálního filtru, Pohoda XML jednotlivě/období a sdílení | CSV aktuálního hledání a filtrů (UTF-8 s BOM, `;`) a sdílení; Pohoda XML zbývá |
 | Skeny | kamera/soubory, upload, polling, náhled, předvyplnění přijaté faktury | V iOS vypnuto; Android zachová přepínač |
-| Relace | Keychain token, odhlášení na 401, mazání cache při odhlášení | Zatím token pouze v paměti, 401 odhlásí |
+| Relace | Keychain token, odhlášení na 401, mazání cache při odhlášení | Token šifrovaný klíčem z Android Keystore (AES-GCM), obnova po startu se zámkem, 401 i odhlášení mažou token a cache |
 | Oprávnění | create/read/update/destroy pro ActuarialsIn/Out a Partner | create u faktur implementováno; ostatní zdroje/akce zbývají |
-| Offline | uložená GET data, datum cache, platnost 30 dní, šifrování | Zbývá |
+| Offline | uložená GET data, datum cache, platnost 30 dní, šifrování | Šifrovaná cache GET odpovědí (Keystore), platnost 30 dní, vynechává `_cont`, `/new`, `/pay`, štítek „Offline – data z …“ |
 | Zámek | biometrie/kód zařízení, vždy zapnutý (nejde vypnout), studený start, prodleva 0/60/300 s | BiometricPrompt s kódem zařízení jako zálohou, nejde vypnout, prodleva pevně 60 s, jedno automatické ověření na zamčení, skryté okno v přepínači aplikací (FLAG_SECURE); volba prodlevy a zámek po studeném startu čekají na trvalou relaci |
 | Uložené přihlášení | volitelné, zabezpečené, biometrické ověření | Zbývá |
 | Upozornění | splatnosti denně 9:00, ve výchozím stavu neutrální text bez firmy a počtů, podrobnosti jen na výslovné zapnutí | Zbývá; při implementaci převzít neutrální výchozí text a volbu podrobností |
 | Widget | snapshot splatností firmy, obnova po otevření, soukromí (jména i částky skryté na zamčené obrazovce) | Zbývá, Android AppWidget; skrývat jména i částky na zamčeném zařízení |
-| Nastavení | zámek, rychlé přihlášení, upozornění, upomínky, widget, cache, verze | Zbývá |
+| Nastavení | zámek, rychlé přihlášení, upozornění, upomínky, widget, cache, verze | Prodleva zámku, upomínky (zapnutí a text), verze, odhlášení; upozornění, widget a rychlé přihlášení zbývají |
 
 ## Smlouva API a významné zvláštnosti
 

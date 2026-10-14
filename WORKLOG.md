@@ -56,3 +56,7 @@
 - Převzato z iOS: zámek aplikace přes BiometricPrompt (biometrie/kód zařízení) bez možnosti vypnutí, jedno automatické ověření na zamčení, skrytý obsah v přepínači aplikací.
 - Nepřevedeno, protože v Androidu zatím neexistuje: partneři, upozornění, widget, nastavení.
 - Bez sestavení, spuštění, testů a volání API dle pokynu zadavatele; nové závislosti androidx.biometric 1.1.0 a androidx.fragment-ktx 1.8.3 nejsou ověřeny sestavením.
+- Etapa 4: trvalá relace (token šifrovaný klíčem z Android Keystore), obnova po startu se zámkem, paměť poslední firmy.
+- Etapa 4: partneři (seznam, hledání, detail, ARES, smazání), úhrada vydané faktury s potvrzením, e-mail, upomínky (výchozí vypnuté), CSV export, Nastavení, šifrovaná offline cache a štítek.
+- Zbývá z důležitých funkcí: přehled (stáří pohledávek, prognóza 30 dní, žebříček partnerů, více měn), upozornění na splatnost (WorkManager, neutrální text), widget, úpravy položek faktury, ruční formulář partnera, Pohoda XML, rychlé přihlášení.
+- Stále bez sestavení, spuštění, testů a volání API dle pokynu zadavatele.

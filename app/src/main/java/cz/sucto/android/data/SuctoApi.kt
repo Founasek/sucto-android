@@ -17,7 +17,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Contract from iOS APIService. Never log credentials, tokens or response bodies. */
-class SuctoApi {
+class SuctoApi(private val cache: ResponseCache? = null) {
+    /** Čas uložení dat, která se právě zobrazují z cache při výpadku připojení; `null`, pokud jsou aktuální. */
+    val cachedDataDate = kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -229,8 +231,11 @@ class SuctoApi {
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
-                    if (continuation.isActive) continuation.resumeWithException(
-                        ApiException("Nepodařilo se připojit. Zkontrolujte připojení k internetu."))
+                    if (!continuation.isActive) return
+                    // Při výpadku připojení se čtení vrátí z cache (zašifrované, nejvýš 30 dní stará).
+                    val saved = if (call.isCanceled() || !ResponseCache.isCacheable(path, method, body)) null else cache?.load(path)
+                    if (saved != null) { cachedDataDate.value = saved.savedAt; continuation.resume(saved.payload) }
+                    else continuation.resumeWithException(ApiException("Nepodařilo se připojit. Zkontrolujte připojení k internetu."))
                 }
                 override fun onResponse(call: Call, response: Response) {
                     try {
@@ -244,6 +249,8 @@ class SuctoApi {
                                 else -> throw ApiException("Server není dostupný (${it.code}). Zkuste to znovu.", statusCode = it.code)
                             }
                         }
+                        if (ResponseCache.isCacheable(path, method, body)) cache?.store(path, payload)
+                        cachedDataDate.value = null
                         if (continuation.isActive) continuation.resume(payload)
                     } catch (error: Exception) {
                         if (continuation.isActive) continuation.resumeWithException(

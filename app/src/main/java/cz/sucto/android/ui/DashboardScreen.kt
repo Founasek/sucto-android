@@ -44,7 +44,7 @@ enum class DashboardTab(val title: String) { Overview("Přehled"), Invoices("Fak
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(company: Company, companies: List<Company>, model: DashboardViewModel, cashModel: CashViewModel, companyModel: CompanyViewModel, partnersModel: PartnersViewModel,
-    onSwitchCompany: (Company) -> Unit, onCompanies: () -> Unit, onLogout: () -> Unit) {
+    offlineSince: Long?, onSwitchCompany: (Company) -> Unit, onCompanies: () -> Unit, onLogout: () -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val cash by cashModel.state.collectAsStateWithLifecycle()
     val profile by companyModel.state.collectAsStateWithLifecycle()
@@ -128,7 +128,14 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
             }
         },
     ) { padding ->
-        val modifier = Modifier.fillMaxSize().padding(padding)
+        Column(Modifier.fillMaxSize().padding(padding)) {
+        if (offlineSince != null) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+            Text("Offline – data z " + java.time.Instant.ofEpochMilli(offlineSince).atZone(java.time.ZoneId.systemDefault())
+                .format(java.time.format.DateTimeFormatter.ofPattern("d. M. yyyy H:mm")), modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.labelMedium)
+        }
+        Box(Modifier.weight(1f)) {
+        val modifier = Modifier.fillMaxSize()
         val detail = state.detail
         if (settingsOpen) SettingsScreen(onLogout, modifier)
         else if (detail != null) InvoiceDetail(detail, state.detailLoading, state.detailError,
@@ -155,6 +162,8 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
             onDirection = { direction = it }, onSearch = { model.search(direction, it) }, onFilter = { model.filter(direction, it) },
             onNext = { model.nextPage(direction) }, onRetry = { if ((if (direction == InvoiceDirection.Outgoing) state.outgoing else state.incoming).items.isEmpty()) model.refresh(direction) else model.nextPage(direction) },
             onOpen = { model.openInvoice(direction, it) }, onAdvanced = { model.advancedFilter(direction, it) }, modifier = modifier)
+        }
+        }
     }
 }
 
