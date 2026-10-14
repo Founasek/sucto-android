@@ -40,7 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 /**
  * Zámek aplikace přes biometrii nebo kód zařízení. Vypnout ho nejde: je zapnutý vždy, když zařízení umí ověření.
  * Aplikace ukazuje finanční data, proto zámek není volba. Zamyká se po návratu z pozadí, pokud v něm byla aspoň
- * [DELAY_MS]. Relace je zatím jen v paměti, takže po studeném startu je stejně potřeba přihlášení.
+ * zvolenou prodlevu (Nastavení, výchozí 1 minuta). Relace je zatím jen v paměti, takže po studeném startu je stejně potřeba přihlášení.
  */
 class AppLockViewModel : ViewModel() {
     data class State(val locked: Boolean = false, val authenticating: Boolean = false, val message: String? = null)
@@ -60,7 +60,7 @@ class AppLockViewModel : ViewModel() {
         val started = backgroundedAt ?: return
         backgroundedAt = null
         if (!isAvailable(context)) { mutableState.value = State(); return }
-        if (SystemClock.elapsedRealtime() - started >= DELAY_MS) lock()
+        if (SystemClock.elapsedRealtime() - started >= cz.sucto.android.data.AppSettings.lockDelayMs(context)) lock()
     }
 
     fun lock() {
@@ -77,8 +77,6 @@ class AppLockViewModel : ViewModel() {
     private fun MutableStateFlow<State>.updateState(transform: (State) -> State) { value = transform(value) }
 
     companion object {
-        const val DELAY_MS = 60_000L
-
         /** `true`, pokud zařízení umí ověření (biometrie nebo kód). Bez zabezpečení zařízení se zamknout nedá. */
         fun isAvailable(context: Context): Boolean =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)

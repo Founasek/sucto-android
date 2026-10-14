@@ -1,1 +1,1 @@
-<paths xmlns:android="http://schemas.android.com/apk/res/android"><cache-path name="payment_qr" path="payment-qr/" /></paths>
+<paths xmlns:android="http://schemas.android.com/apk/res/android"><cache-path name="payment_qr" path="payment-qr/" /><cache-path name="exports" path="exports/" /></paths>

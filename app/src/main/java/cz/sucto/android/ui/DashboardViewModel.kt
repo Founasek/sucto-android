@@ -23,7 +23,7 @@ data class DashboardState(val year: Int = LocalDate.now().year, val overview: Ov
     val overviewLoading: Boolean = false, val overviewError: String? = null,
     val outgoing: InvoiceListState = InvoiceListState(), val incoming: InvoiceListState = InvoiceListState(),
     val createDirection: InvoiceDirection? = null, val copyInvoiceId: Int? = null, val detailDirection: InvoiceDirection = InvoiceDirection.Outgoing,
-    val detail: Invoice? = null, val detailLoading: Boolean = false, val detailError: String? = null)
+    val detail: Invoice? = null, val detailLoading: Boolean = false, val detailError: String? = null, val actionBusy: Boolean = false)
 
 class DashboardViewModel(private val api: SuctoApi, private val token: String, private val companyId: Int,
     private val onUnauthorized: () -> Unit) : ViewModel() {
@@ -153,6 +153,44 @@ class DashboardViewModel(private val api: SuctoApi, private val token: String, p
             }
         }
     }
+    /** Uhradí vydanou fakturu (po potvrzení v UI): vytvoří pokladní doklad, pak obnoví detail, seznam i přehled. */
+    fun payInvoice(invoice: Invoice) {
+        if (state.value.actionBusy) return
+        mutableState.update { it.copy(actionBusy = true) }
+        viewModelScope.launch {
+            try {
+                val voucher = api.payInvoice(token, companyId, invoice.id)
+                mutableState.update { it.copy(actionBusy = false, message = "Zaplaceno" + if (voucher > 0) " – doklad č. $voucher" else "") }
+                openInvoice(InvoiceDirection.Outgoing, invoice); refresh(InvoiceDirection.Outgoing); refreshOverview()
+            } catch (error: CancellationException) { throw error
+            } catch (error: Exception) { mutableState.update { it.copy(actionBusy = false, message = handle(error)) } }
+        }
+    }
+    /** Pošle vydanou fakturu e-mailem (i jako upomínku). `done` dostane text chyby, nebo `null` při úspěchu. */
+    fun sendEmail(invoice: Invoice, email: String, comment: String, done: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                api.sendInvoiceEmail(token, companyId, invoice.id, email.trim(), comment)
+                mutableState.update { it.copy(message = "Odesláno: ${email.trim()}") }
+                done(null)
+            } catch (error: CancellationException) { throw error
+            } catch (error: Exception) { done(handle(error)) }
+        }
+    }
+    /** Všechny faktury odpovídající hledání a filtrům daného směru (pro export do CSV). */
+    suspend fun fetchAllMatching(direction: InvoiceDirection): List<Invoice> {
+        val query = list(direction).query
+        val all = mutableListOf<Invoice>()
+        val seen = mutableSetOf<Int>()
+        for (page in 1..100) {
+            val values = api.invoices(token, companyId, direction, query.parameters(page))
+            val fresh = values.filter { seen.add(it.id) }
+            if (fresh.isEmpty()) return all
+            all += if (query.filter == InvoiceFilter.Overdue) fresh.filter { it.isOverdue } else fresh
+        }
+        throw ApiException("Export obsahuje příliš mnoho stránek. Zpřesněte hledání nebo filtr.")
+    }
+    fun showMessage(text: String) = mutableState.update { it.copy(message = text) }
     fun closeInvoice() {
         detailGeneration++; detailJob?.cancel()
         mutableState.update { it.copy(detail = null, detailLoading = false, detailError = null) }

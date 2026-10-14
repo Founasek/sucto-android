@@ -107,6 +107,13 @@ class SuctoApi {
     /** Vytvoří partnera podle IČO z ARES (POST s prázdným JSON tělem). */
     suspend fun createPartnerByAres(token: String, companyId: Int, ic: String): PartnerRecord =
         PartnerRecord.fromJson(JSONObject(request("companies/$companyId/partners/create_by_ares/$ic", token, "{}")))
+    /** Úhrada vydané faktury je v API `GET .../pay` (vytvoří pokladní doklad); nikdy se nevolá automaticky ani z cache. Vrací id dokladu. */
+    suspend fun payInvoice(token: String, companyId: Int, invoiceId: Int): Int =
+        JSONObject(request("companies/$companyId/actuarials_outs/$invoiceId/pay", token)).optInt("cash_voucher_id")
+    suspend fun sendInvoiceEmail(token: String, companyId: Int, invoiceId: Int, email: String, comment: String) {
+        val body = JSONObject().put("email", email).apply { if (comment.isNotBlank()) put("comment", comment) }.toString()
+        request("companies/$companyId/actuarials_outs/$invoiceId/send_to_email", token, body, method = "PATCH")
+    }
     suspend fun deletePartner(token: String, companyId: Int, partnerId: Int) {
         request("companies/$companyId/partners/$partnerId", token, method = "DELETE")
     }
@@ -216,6 +223,7 @@ class SuctoApi {
             val builder = Request.Builder().url(BASE_URL + path).header("Accept", "application/json")
             if (token != null) builder.header("Auth-Token", token)
             if (method == "DELETE") builder.delete()
+            else if (method == "PATCH") builder.patch((body ?: "{}").toRequestBody("application/json; charset=utf-8".toMediaType()))
             else if (body != null) builder.post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
             val call = client.newCall(builder.build())
             continuation.invokeOnCancellation { call.cancel() }

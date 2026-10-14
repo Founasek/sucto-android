@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.sucto.android.data.*
+import kotlinx.coroutines.launch
 import cz.sucto.android.ui.theme.*
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -49,6 +50,12 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
     val profile by companyModel.state.collectAsStateWithLifecycle()
     val partners by partnersModel.state.collectAsStateWithLifecycle()
     var switcher by remember { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var exporting by remember { mutableStateOf(false) }
+    // Přepínač upomínek se načte znovu po návratu z Nastavení.
+    val remindersEnabled = remember(settingsOpen) { AppSettings.remindersEnabled(context) }
     var partnersOpen by rememberSaveable { mutableStateOf(false) }
     val canCreatePartner = true // oprávnění Partner se při neznámém stavu nechává na serveru, jako v iOS
     var tab by rememberSaveable { mutableStateOf(DashboardTab.Overview) }
@@ -67,15 +74,15 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
         })
         return
     }
-    BackHandler { if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else if (tab == DashboardTab.Company && partners.detail != null) partnersModel.closeDetail() else if (tab == DashboardTab.Company && partnersOpen) partnersOpen = false else if (profile.selectedAccount != null) companyModel.openAccount(null) else onCompanies() }
+    BackHandler { if (settingsOpen) settingsOpen = false else if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else if (tab == DashboardTab.Company && partners.detail != null) partnersModel.closeDetail() else if (tab == DashboardTab.Company && partnersOpen) partnersOpen = false else if (profile.selectedAccount != null) companyModel.openAccount(null) else onCompanies() }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(title = { Text(state.detail?.number ?: cash.detail?.number ?: (if (tab == DashboardTab.Company) partners.detail?.name.takeIf { partnersOpen } ?: (if (partnersOpen) "Partneři" else profile.selectedAccount?.name) else null) ?: company.name, maxLines = 2) },
+            TopAppBar(title = { Text((if (settingsOpen) "Nastavení" else null) ?: state.detail?.number ?: cash.detail?.number ?: (if (tab == DashboardTab.Company) partners.detail?.name.takeIf { partnersOpen } ?: (if (partnersOpen) "Partneři" else profile.selectedAccount?.name) else null) ?: company.name, maxLines = 2) },
                 navigationIcon = {
                     val accountOpen = tab == DashboardTab.Company && (profile.selectedAccount != null || partnersOpen)
-                    if (state.detail != null || cash.detail != null || accountOpen) IconButton(onClick = {
-                        if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close()
+                    if (settingsOpen || state.detail != null || cash.detail != null || accountOpen) IconButton(onClick = {
+                        if (settingsOpen) settingsOpen = false else if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close()
                         else if (partners.detail != null) partnersModel.closeDetail() else if (partnersOpen) partnersOpen = false else companyModel.openAccount(null)
                     }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Zpět na seznam")
@@ -87,6 +94,17 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Menu") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            if (tab == DashboardTab.Invoices && state.detail == null && cash.detail == null) DropdownMenuItem(
+                                text = { Text(if (exporting) "Exportuji…" else "Exportovat seznam do CSV") }, enabled = !exporting, onClick = {
+                                    menu = false; exporting = true
+                                    scope.launch {
+                                        try { shareInvoicesCsv(context, model.fetchAllMatching(direction), direction == InvoiceDirection.Outgoing)
+                                        } catch (error: kotlinx.coroutines.CancellationException) { throw error
+                                        } catch (error: Exception) { model.showMessage((error as? ApiException)?.message ?: "Export se nezdařil.")
+                                        } finally { exporting = false }
+                                    }
+                                })
+                            DropdownMenuItem(text = { Text("Nastavení") }, onClick = { menu = false; settingsOpen = true })
                             DropdownMenuItem(text = { Text("Odhlásit se") }, onClick = { menu = false; onLogout() })
                         }
                     }
@@ -112,11 +130,18 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
     ) { padding ->
         val modifier = Modifier.fillMaxSize().padding(padding)
         val detail = state.detail
-        if (detail != null) InvoiceDetail(detail, state.detailLoading, state.detailError,
+        if (settingsOpen) SettingsScreen(onLogout, modifier)
+        else if (detail != null) InvoiceDetail(detail, state.detailLoading, state.detailError,
             onRetry = { model.openInvoice(state.detailDirection, detail) },
             onDuplicate = { model.openCreate(state.detailDirection, detail.id) },
             canDuplicate = if (state.detailDirection == InvoiceDirection.Outgoing) state.canCreateOutgoing else state.canCreateIncoming,
             recipient = if (state.detailDirection == InvoiceDirection.Outgoing) company.name else detail.partner,
+            actions = if (state.detailDirection == InvoiceDirection.Outgoing) InvoiceActions(
+                canPay = detail.statusId !in listOf(1, 8, 10, 11), busy = state.actionBusy,
+                remindersEnabled = remindersEnabled, companyName = company.name,
+                lastReminder = AppSettings.lastReminder(context, detail.id)?.format(java.time.format.DateTimeFormatter.ofPattern("d. M. yyyy")),
+                onPay = { model.payInvoice(detail) }, onEmail = { email, comment, done -> model.sendEmail(detail, email, comment, done) },
+                onReminderSent = { AppSettings.recordReminder(context, detail.id) }) else null,
             modifier = modifier)
         else if (tab == DashboardTab.Company && partnersOpen) {
             if (partners.detail != null) PartnerDetailScreen(partners, partnersModel, canCreatePartner, modifier)
@@ -312,7 +337,22 @@ private fun InvoiceBadge(invoice: Invoice) {
 }
 @Composable
 private fun InvoiceDetail(invoice: Invoice, loading: Boolean, error: String?, onRetry: () -> Unit,
-    onDuplicate: () -> Unit, canDuplicate: Boolean, recipient: String?, modifier: Modifier) {
+    onDuplicate: () -> Unit, canDuplicate: Boolean, recipient: String?, actions: InvoiceActions?, modifier: Modifier) {
+    var confirmPay by remember(invoice.id) { mutableStateOf(false) }
+    var emailDialog by remember(invoice.id) { mutableStateOf(false) }
+    var reminderDialog by remember(invoice.id) { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    if (confirmPay && actions != null) AlertDialog(onDismissRequest = { confirmPay = false }, title = { Text("Uhradit fakturu?") },
+        text = { Text("Faktura ${invoice.number} se označí jako zaplacená a vytvoří se pokladní doklad. Akci nelze vrátit zpět.") },
+        confirmButton = { TextButton(onClick = { confirmPay = false; actions.onPay() }) { Text("Uhradit") } },
+        dismissButton = { TextButton(onClick = { confirmPay = false }) { Text("Zrušit") } })
+    if (emailDialog && actions != null) SendEmailDialog("Odeslat fakturu e-mailem", invoice.partnerEmail.orEmpty(), "", "Zpráva (nepovinná)", null,
+        actions.onEmail, onDismiss = { emailDialog = false })
+    if (reminderDialog && actions != null) SendEmailDialog("Odeslat upomínku", invoice.partnerEmail.orEmpty(),
+        Reminders.render(AppSettings.reminderTemplate(context), invoice, actions.companyName), "Text upomínky",
+        "Zpráva se odešle zákazníkovi spolu s fakturou. Výchozí text změníte v Nastavení." + (actions.lastReminder?.let { " Poslední upomínka byla odeslána $it." } ?: ""),
+        { email, comment, done -> actions.onEmail(email, comment) { failure -> if (failure == null) actions.onReminderSent(); done(failure) } },
+        onDismiss = { reminderDialog = false })
     var showQr by remember(invoice.id) { mutableStateOf(false) }
     if (showQr) InvoiceQrSheet(invoice, recipient, onDismiss = { showQr = false })
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -329,6 +369,17 @@ private fun InvoiceDetail(invoice: Invoice, loading: Boolean, error: String?, on
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (canDuplicate) OutlinedButton(onClick = onDuplicate, modifier = Modifier.weight(1f)) { Text("Duplikovat") }
                 if (PaymentQr.payload(invoice, recipient) != null) OutlinedButton(onClick = { showQr = true }, modifier = Modifier.weight(1f)) { Text("QR platba") }
+            }
+        }
+        if (!loading && error == null && actions != null) item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (actions.canPay) Button(onClick = { confirmPay = true }, enabled = !actions.busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (actions.busy) "Zpracovávám…" else "Uhradit fakturu")
+                }
+                OutlinedButton(onClick = { emailDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Odeslat e-mailem") }
+                if (actions.remindersEnabled && invoice.isOverdue) OutlinedButton(onClick = { reminderDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Odeslat upomínku")
+                }
             }
         }
         if (loading) item { Loading("Načítám detail…") }
