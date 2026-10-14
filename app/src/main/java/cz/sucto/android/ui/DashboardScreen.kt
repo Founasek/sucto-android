@@ -42,20 +42,23 @@ enum class DashboardTab(val title: String) { Overview("Přehled"), Invoices("Fak
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(company: Company, companies: List<Company>, model: DashboardViewModel, cashModel: CashViewModel, companyModel: CompanyViewModel,
+fun DashboardScreen(company: Company, companies: List<Company>, model: DashboardViewModel, cashModel: CashViewModel, companyModel: CompanyViewModel, partnersModel: PartnersViewModel,
     onSwitchCompany: (Company) -> Unit, onCompanies: () -> Unit, onLogout: () -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val cash by cashModel.state.collectAsStateWithLifecycle()
     val profile by companyModel.state.collectAsStateWithLifecycle()
+    val partners by partnersModel.state.collectAsStateWithLifecycle()
     var switcher by remember { mutableStateOf(false) }
+    var partnersOpen by rememberSaveable { mutableStateOf(false) }
+    val canCreatePartner = true // oprávnění Partner se při neznámém stavu nechává na serveru, jako v iOS
     var tab by rememberSaveable { mutableStateOf(DashboardTab.Overview) }
     var direction by rememberSaveable { mutableStateOf(InvoiceDirection.Outgoing) }
     var menu by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); model.clearMessage() } }
-    DisposableEffect(model, cashModel, companyModel) {
+    DisposableEffect(model, cashModel, companyModel, partnersModel) {
         model.start(); cashModel.start(); companyModel.start()
-        onDispose { model.stop(); cashModel.stop(); companyModel.stop() }
+        onDispose { model.stop(); cashModel.stop(); companyModel.stop(); partnersModel.stop() }
     }
     if (switcher) CompanySwitcherSheet(companies, company, onSelect = { switcher = false; onSwitchCompany(it) }, onDismiss = { switcher = false })
     if (state.createDirection != null) {
@@ -64,21 +67,22 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
         })
         return
     }
-    BackHandler { if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else if (profile.selectedAccount != null) companyModel.openAccount(null) else onCompanies() }
+    BackHandler { if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else if (tab == DashboardTab.Company && partners.detail != null) partnersModel.closeDetail() else if (tab == DashboardTab.Company && partnersOpen) partnersOpen = false else if (profile.selectedAccount != null) companyModel.openAccount(null) else onCompanies() }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(title = { Text(state.detail?.number ?: cash.detail?.number ?: profile.selectedAccount?.name.takeIf { tab == DashboardTab.Company } ?: company.name, maxLines = 2) },
+            TopAppBar(title = { Text(state.detail?.number ?: cash.detail?.number ?: (if (tab == DashboardTab.Company) partners.detail?.name.takeIf { partnersOpen } ?: (if (partnersOpen) "Partneři" else profile.selectedAccount?.name) else null) ?: company.name, maxLines = 2) },
                 navigationIcon = {
-                    val accountOpen = tab == DashboardTab.Company && profile.selectedAccount != null
+                    val accountOpen = tab == DashboardTab.Company && (profile.selectedAccount != null || partnersOpen)
                     if (state.detail != null || cash.detail != null || accountOpen) IconButton(onClick = {
-                        if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else companyModel.openAccount(null)
+                        if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close()
+                        else if (partners.detail != null) partnersModel.closeDetail() else if (partnersOpen) partnersOpen = false else companyModel.openAccount(null)
                     }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Zpět na seznam")
                     }
                 }, actions = {
                     if (state.detail == null && cash.detail == null) IconButton(onClick = {
-                        when (tab) { DashboardTab.Overview -> model.refreshOverview(); DashboardTab.Invoices -> model.refresh(direction); DashboardTab.Cash -> cashModel.refresh(); DashboardTab.Company -> companyModel.refresh() }
+                        when (tab) { DashboardTab.Overview -> model.refreshOverview(); DashboardTab.Invoices -> model.refresh(direction); DashboardTab.Cash -> cashModel.refresh(); DashboardTab.Company -> if (partnersOpen) partnersModel.refresh() else companyModel.refresh() }
                     }) { Icon(Icons.Default.Refresh, contentDescription = "Obnovit") }
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Menu") }
@@ -114,7 +118,12 @@ fun DashboardScreen(company: Company, companies: List<Company>, model: Dashboard
             canDuplicate = if (state.detailDirection == InvoiceDirection.Outgoing) state.canCreateOutgoing else state.canCreateIncoming,
             recipient = if (state.detailDirection == InvoiceDirection.Outgoing) company.name else detail.partner,
             modifier = modifier)
-        else if (tab == DashboardTab.Company) CompanyScreen(company, profile, companyModel::refresh, companyModel::openAccount, { switcher = true }, modifier)
+        else if (tab == DashboardTab.Company && partnersOpen) {
+            if (partners.detail != null) PartnerDetailScreen(partners, partnersModel, canCreatePartner, modifier)
+            else PartnersScreen(partners, partnersModel, canCreatePartner, modifier)
+        }
+        else if (tab == DashboardTab.Company) CompanyScreen(company, profile, companyModel::refresh, companyModel::openAccount, { switcher = true },
+            { partnersOpen = true; partnersModel.start() }, modifier)
         else if (cash.detail != null || tab == DashboardTab.Cash) CashScreen(cash, cashModel, modifier)
         else if (tab == DashboardTab.Overview) OverviewScreen(state, model::selectYear, model::refreshOverview, modifier)
         else InvoiceListScreen(if (direction == InvoiceDirection.Outgoing) state.outgoing else state.incoming, direction,

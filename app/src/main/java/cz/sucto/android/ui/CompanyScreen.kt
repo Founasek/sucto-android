@@ -21,7 +21,7 @@ import cz.sucto.android.data.*
 /** Záložka Firma: údaje o firmě, účty a přepnutí firmy. Dvojí klepnutí na záložku otevře přepínač (řeší DashboardScreen). */
 @Composable
 fun CompanyScreen(company: Company, state: CompanyState, onRetry: () -> Unit, onAccount: (CompanyAccount?) -> Unit,
-    onSwitch: () -> Unit, modifier: Modifier) {
+    onSwitch: () -> Unit, onPartners: () -> Unit, modifier: Modifier) {
     val account = state.selectedAccount
     if (account != null) { AccountDetail(account, modifier); return }
     val detail = state.detail
@@ -51,6 +51,16 @@ fun CompanyScreen(company: Company, state: CompanyState, onRetry: () -> Unit, on
         if (state.accounts.isNotEmpty()) {
             item { SectionHeader("Účty") }
             items(state.accounts, key = { it.id }) { account -> AccountCard(account) { onAccount(account) } }
+        }
+        item { SectionHeader("Partneři") }
+        item {
+            Card(onClick = onPartners, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Odběratelé a dodavatelé", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Seznam, vyhledávání a přidání partnera", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
         item {
             OutlinedButton(onClick = onSwitch, modifier = Modifier.fillMaxWidth()) { Text("Přepnout firmu") }

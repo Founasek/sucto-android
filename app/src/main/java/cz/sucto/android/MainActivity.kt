@@ -39,6 +39,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import cz.sucto.android.ui.AppLockViewModel
 import cz.sucto.android.ui.CompanyViewModel
+import cz.sucto.android.ui.PartnersViewModel
 import cz.sucto.android.ui.LockScreen
 import cz.sucto.android.ui.CashViewModel
 import cz.sucto.android.ui.DashboardScreen
@@ -50,6 +51,7 @@ import cz.sucto.android.ui.theme.*
 
 class MainActivity : FragmentActivity() {
     private val lock: AppLockViewModel by viewModels()
+    private val auth: AuthViewModel by viewModels()
 
     // V přepínači aplikací se nesmí ukázat obsah: okno je při odchodu do pozadí označené jako zabezpečené.
     override fun onPause() { window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE); super.onPause() }
@@ -59,9 +61,11 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Obnovená relace po studeném startu je zamčená; po otočení obrazovky (savedInstanceState) se nezamyká znovu.
+        if (savedInstanceState == null && auth.state.value.signedIn && AppLockViewModel.isAvailable(this)) lock.lock()
         enableEdgeToEdge()
         setContent {
-            val model: AuthViewModel = viewModel()
+            val model = auth
             val state by model.state.collectAsStateWithLifecycle()
             SuctoTheme(dark = if (state.signedIn) androidx.compose.foundation.isSystemInDarkTheme() else true) {
                 val company = state.selectedCompany
@@ -71,7 +75,8 @@ class MainActivity : FragmentActivity() {
                         factory = model.dashboardFactory(company.id))
                     val cash: CashViewModel = viewModel(viewModelStoreOwner = owner, key = "cash-${state.sessionId}-${company.id}", factory = model.cashFactory(company.id))
                     val profile: CompanyViewModel = viewModel(viewModelStoreOwner = owner, key = "company-${state.sessionId}-${company.id}", factory = model.companyFactory(company.id))
-                    DashboardScreen(company, state.companies, dashboard, cash, profile, onSwitchCompany = model::selectCompany,
+                    val partners: PartnersViewModel = viewModel(viewModelStoreOwner = owner, key = "partners-${state.sessionId}-${company.id}", factory = model.partnersFactory(company.id))
+                    DashboardScreen(company, state.companies, dashboard, cash, profile, partners, onSwitchCompany = model::selectCompany,
                         onCompanies = { model.selectCompany(null) }, onLogout = model::logout)
                 } else if (state.signedIn) CompaniesScreen(state, model::refreshCompanies, model::logout, model::selectCompany)
                 else LoginScreen(state, model::login)

@@ -95,6 +95,22 @@ class SuctoApi {
                 item.optJSONObject("currency")?.let { c -> if (c.isNull("id")) null else c.getInt("id") })
         }
     }
+    /** Jedna stránka partnerů (hledání na serveru podle názvu, IČ, DIČ a adresy). */
+    suspend fun partnerRecords(token: String, companyId: Int, search: String, page: Int, limit: Int): List<PartnerRecord> {
+        val params = mutableMapOf("page" to page.toString(), "limit" to limit.toString())
+        if (search.isNotBlank()) params["q[name_or_ic_or_dic_or_address_street_or_address_city_cont]"] = search.trim()
+        val array = JSONArray(request(queryPath("companies/$companyId/partners", params), token))
+        return List(array.length()) { PartnerRecord.fromJson(array.getJSONObject(it)) }
+    }
+    suspend fun partnerRecord(token: String, companyId: Int, partnerId: Int): PartnerRecord =
+        PartnerRecord.fromJson(JSONObject(request("companies/$companyId/partners/$partnerId", token)))
+    /** Vytvoří partnera podle IČO z ARES (POST s prázdným JSON tělem). */
+    suspend fun createPartnerByAres(token: String, companyId: Int, ic: String): PartnerRecord =
+        PartnerRecord.fromJson(JSONObject(request("companies/$companyId/partners/create_by_ares/$ic", token, "{}")))
+    suspend fun deletePartner(token: String, companyId: Int, partnerId: Int) {
+        request("companies/$companyId/partners/$partnerId", token, method = "DELETE")
+    }
+
     suspend fun draftReferences(token: String, company: Company): DraftReferences = kotlinx.coroutines.coroutineScope {
         val currencies = async { choices(JSONArray(request("currencies", token)), currency = true) }
         val accounts = async {
@@ -195,11 +211,12 @@ class SuctoApi {
         }.filter { it.months.any { m -> m.revenue.signum() != 0 || m.cost.signum() != 0 } }
         return Overview(sections, true)
     }
-    private suspend fun request(path: String, token: String? = null, body: String? = null): String =
+    private suspend fun request(path: String, token: String? = null, body: String? = null, method: String? = null): String =
         suspendCancellableCoroutine { continuation ->
             val builder = Request.Builder().url(BASE_URL + path).header("Accept", "application/json")
             if (token != null) builder.header("Auth-Token", token)
-            if (body != null) builder.post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
+            if (method == "DELETE") builder.delete()
+            else if (body != null) builder.post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
             val call = client.newCall(builder.build())
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
