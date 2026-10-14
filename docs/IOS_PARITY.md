@@ -14,17 +14,18 @@ Toto je mapa zdrojového kódu, nikoli potvrzení shody při běhu. iOS změny s
 | Nová faktura | oba směry, číselníky, položky, DPH, součty, duplikace | Formulář obou směrů, partneři, číselníky, položky, výpočty, validace a duplikace implementovány; neověřeno za běhu |
 | Úpravy položek | přidání, úprava a mazání řádků existující faktury | Zbývá |
 | Pokladna | příjmové/výdajové, hledání, stránkování, detail, odeslání | Oba směry, hledání, další stránky a základní detail; odesílání zbývá |
-| Partneři | hledání, detail, obratové grafy, formulář, úprava/mazání, ARES | Zbývá |
-| Účty | seznam, detail, měna | Zbývá |
+| Partneři | hledání, detail, obratové grafy, formulář, úprava/mazání, ARES | Zbývá (v iOS je vstup do partnerů v záložce Firma, po implementaci stejně i zde) |
+| Firma | záložka Firma: údaje (GET companies/{id}), účty, partneři, přepnutí firmy (tlačítko, opakované klepnutí na záložku) | Údaje, účty a přepnutí firmy (tlačítko i opakované klepnutí) implementovány; partneři zbývají; DIČ API nevrací |
+| Účty | seznam, detail, měna | Seznam a detail účtů v záložce Firma (kopírování čísla účtu, IBAN, SWIFT); měna zůstatku zbývá |
 | Export | CSV aktuálního filtru, Pohoda XML jednotlivě/období a sdílení | Zbývá |
 | Skeny | kamera/soubory, upload, polling, náhled, předvyplnění přijaté faktury | V iOS vypnuto; Android zachová přepínač |
 | Relace | Keychain token, odhlášení na 401, mazání cache při odhlášení | Zatím token pouze v paměti, 401 odhlásí |
 | Oprávnění | create/read/update/destroy pro ActuarialsIn/Out a Partner | create u faktur implementováno; ostatní zdroje/akce zbývají |
 | Offline | uložená GET data, datum cache, platnost 30 dní, šifrování | Zbývá |
-| Zámek | biometrie/kód zařízení, studený start, prodleva 0/60/300 s | Zbývá, Android BiometricPrompt/Keystore |
+| Zámek | biometrie/kód zařízení, vždy zapnutý (nejde vypnout), studený start, prodleva 0/60/300 s | BiometricPrompt s kódem zařízení jako zálohou, nejde vypnout, prodleva pevně 60 s, jedno automatické ověření na zamčení, skryté okno v přepínači aplikací (FLAG_SECURE); volba prodlevy a zámek po studeném startu čekají na trvalou relaci |
 | Uložené přihlášení | volitelné, zabezpečené, biometrické ověření | Zbývá |
-| Upozornění | splatnosti denně 9:00, bez částek a jmen, plánování při otevření | Zbývá |
-| Widget | snapshot splatností firmy, obnova po otevření, soukromí | Zbývá, Android AppWidget |
+| Upozornění | splatnosti denně 9:00, ve výchozím stavu neutrální text bez firmy a počtů, podrobnosti jen na výslovné zapnutí | Zbývá; při implementaci převzít neutrální výchozí text a volbu podrobností |
+| Widget | snapshot splatností firmy, obnova po otevření, soukromí (jména i částky skryté na zamčené obrazovce) | Zbývá, Android AppWidget; skrývat jména i částky na zamčeném zařízení |
 | Nastavení | zámek, rychlé přihlášení, upozornění, upomínky, widget, cache, verze | Zbývá |
 
 ## Smlouva API a významné zvláštnosti
@@ -78,3 +79,12 @@ Odpovědi API mají český formát dd. MM. yyyy (iOS String.toDate). Parametry 
   SPAYD je generován lokálně bez sdílení finančních údajů s generátorem třetí strany.
   AM se omezí na podporovaných 9 999 999,99; nad tímto limitem se QR nenabízí.
 - Nic nebylo sestaveno, spuštěno ani testováno podle pokynu zadavatele.
+## Shoda s iOS 2026-10-14 (Firma, zámek, soukromí)
+
+- Záložka Firma: Přehled / Faktury / Pokladna / Firma. „Změnit firmu“ z menu je pryč, firmu lze přepnout tlačítkem na záložce
+  nebo opakovaným klepnutím na záložku Firma. Přepnutí čistí view modely původní firmy, takže faktury a přehled patří nové firmě.
+- Zámek aplikace nejde vypnout. Bez kódu nebo biometrie na zařízení se zamknout nedá.
+- Android nemá obdobu iOS Privacy Manifestu. Odpovídá mu formulář Data safety v Google Play Console; při publikaci uvést e-mail,
+  finanční údaje a obsah uživatele (jen funkce aplikace, bez sdílení třetím stranám a bez sledování).
+- Vstupní animace karet, které se v iOS odstranily, Android nikdy neměl; pozadí všech záložek je `MaterialTheme.colorScheme.background`.
+- Beze změny: partneři, upozornění a widget v Androidu zatím neexistují, proto se tam nic neupravovalo.

@@ -43,6 +43,28 @@ class SuctoApi {
         }
     }
 
+    /** GET companies/{id}: údaje o firmě včetně adresy (DIČ endpoint nevrací). */
+    suspend fun companyDetail(token: String, companyId: Int): CompanyDetail {
+        val item = JSONObject(request("companies/$companyId", token))
+        val address = item.optJSONObject("address")
+        val street = listOfNotNull(address?.text("street"), address?.text("city_part")).filter { it.isNotBlank() }.joinToString(", ")
+        val city = listOfNotNull(address?.text("zip"), address?.text("city")).filter { it.isNotBlank() }.joinToString(" ")
+        return CompanyDetail(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"),
+            item.text("email"), listOf(street, city).filter { it.isNotEmpty() })
+    }
+
+    /** GET companies/{id}/accounts: bankovní i pokladní účty (account_type 1 = pokladna). */
+    suspend fun accounts(token: String, companyId: Int): List<CompanyAccount> {
+        val values = JSONArray(request("companies/$companyId/accounts", token))
+        return List(values.length()) {
+            val item = values.getJSONObject(it)
+            val bank = item.optJSONObject("bank_account")
+            CompanyAccount(item.optInt("id", -(it + 1)), item.getString("name"), item.optInt("account_type") == 1,
+                item.optBoolean("is_deactivated"), item.text("prefix"), item.text("opening_balance"),
+                bank?.text("account"), bank?.text("bank_code"), bank?.text("iban"), bank?.text("swift"), bank?.text("bank_name"))
+        }
+    }
+
     suspend fun invoices(token: String, companyId: Int, direction: InvoiceDirection, params: Map<String, String>): List<Invoice> {
         val array = JSONArray(request(queryPath("companies/$companyId/${direction.path}", params), token))
         return List(array.length()) { Invoice.fromJson(array.getJSONObject(it), direction) }
@@ -219,4 +241,9 @@ class SuctoApi {
     companion object { const val BASE_URL = "https://www.sucto.cz/api/" }
 }
 data class Company(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val countryId: Int)
+data class CompanyDetail(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val email: String?, val addressLines: List<String>)
+data class CompanyAccount(val id: Int, val name: String, val isCash: Boolean, val isDeactivated: Boolean, val prefix: String?,
+    val openingBalance: String?, val account: String?, val bankCode: String?, val iban: String?, val swift: String?, val bankName: String?) {
+    val accountNumber: String? get() = account?.let { it + (bankCode?.let { code -> "/$code" } ?: "") }
+}
 class ApiException(message: String, val unauthorized: Boolean = false, val statusCode: Int? = null) : Exception(message)

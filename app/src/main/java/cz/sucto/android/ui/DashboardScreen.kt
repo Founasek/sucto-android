@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
@@ -37,45 +38,51 @@ import java.time.LocalDate
 import kotlin.math.abs
 import kotlin.math.max
 
-enum class DashboardTab(val title: String) { Overview("Přehled"), Invoices("Faktury"), Cash("Pokladna") }
+enum class DashboardTab(val title: String) { Overview("Přehled"), Invoices("Faktury"), Cash("Pokladna"), Company("Firma") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(company: Company, model: DashboardViewModel, cashModel: CashViewModel, onCompanies: () -> Unit, onLogout: () -> Unit) {
+fun DashboardScreen(company: Company, companies: List<Company>, model: DashboardViewModel, cashModel: CashViewModel, companyModel: CompanyViewModel,
+    onSwitchCompany: (Company) -> Unit, onCompanies: () -> Unit, onLogout: () -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val cash by cashModel.state.collectAsStateWithLifecycle()
+    val profile by companyModel.state.collectAsStateWithLifecycle()
+    var switcher by remember { mutableStateOf(false) }
     var tab by rememberSaveable { mutableStateOf(DashboardTab.Overview) }
     var direction by rememberSaveable { mutableStateOf(InvoiceDirection.Outgoing) }
     var menu by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); model.clearMessage() } }
-    DisposableEffect(model, cashModel) {
-        model.start(); cashModel.start()
-        onDispose { model.stop(); cashModel.stop() }
+    DisposableEffect(model, cashModel, companyModel) {
+        model.start(); cashModel.start(); companyModel.start()
+        onDispose { model.stop(); cashModel.stop(); companyModel.stop() }
     }
+    if (switcher) CompanySwitcherSheet(companies, company, onSelect = { switcher = false; onSwitchCompany(it) }, onDismiss = { switcher = false })
     if (state.createDirection != null) {
         InvoiceCreateHost(model.createFactory(company), model.createOwner, onClose = model::closeCreate, onSaved = { id ->
             model.invoiceCreated(id); tab = DashboardTab.Invoices; direction = state.createDirection ?: direction
         })
         return
     }
-    BackHandler { if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else onCompanies() }
+    BackHandler { if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else if (profile.selectedAccount != null) companyModel.openAccount(null) else onCompanies() }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(title = { Text(state.detail?.number ?: cash.detail?.number ?: company.name, maxLines = 2) },
+            TopAppBar(title = { Text(state.detail?.number ?: cash.detail?.number ?: profile.selectedAccount?.name.takeIf { tab == DashboardTab.Company } ?: company.name, maxLines = 2) },
                 navigationIcon = {
-                    if (state.detail != null || cash.detail != null) IconButton(onClick = { if (state.detail != null) model.closeInvoice() else cashModel.close() }) {
+                    val accountOpen = tab == DashboardTab.Company && profile.selectedAccount != null
+                    if (state.detail != null || cash.detail != null || accountOpen) IconButton(onClick = {
+                        if (state.detail != null) model.closeInvoice() else if (cash.detail != null) cashModel.close() else companyModel.openAccount(null)
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Zpět na seznam")
                     }
                 }, actions = {
                     if (state.detail == null && cash.detail == null) IconButton(onClick = {
-                        when (tab) { DashboardTab.Overview -> model.refreshOverview(); DashboardTab.Invoices -> model.refresh(direction); DashboardTab.Cash -> cashModel.refresh() }
+                        when (tab) { DashboardTab.Overview -> model.refreshOverview(); DashboardTab.Invoices -> model.refresh(direction); DashboardTab.Cash -> cashModel.refresh(); DashboardTab.Company -> companyModel.refresh() }
                     }) { Icon(Icons.Default.Refresh, contentDescription = "Obnovit") }
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Menu") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Změnit firmu") }, onClick = { menu = false; onCompanies() })
                             DropdownMenuItem(text = { Text("Odhlásit se") }, onClick = { menu = false; onLogout() })
                         }
                     }
@@ -90,8 +97,10 @@ fun DashboardScreen(company: Company, model: DashboardViewModel, cashModel: Cash
         bottomBar = {
             if (state.detail == null && cash.detail == null) NavigationBar {
                 DashboardTab.entries.forEach { item ->
-                    NavigationBarItem(selected = tab == item, onClick = { tab = item },
-                        icon = { Icon(if (item == DashboardTab.Overview) Icons.Default.Home else Icons.Default.List, contentDescription = null) },
+                    // Opakované klepnutí na už otevřenou záložku Firma otevře přepínač firem.
+                    NavigationBarItem(selected = tab == item, onClick = { if (item == DashboardTab.Company && tab == item) switcher = true else tab = item },
+                        icon = { Icon(when (item) { DashboardTab.Overview -> Icons.Default.Home; DashboardTab.Company -> Icons.Default.AccountBox
+                            else -> Icons.Default.List }, contentDescription = null) },
                         label = { Text(item.title) })
                 }
             }
@@ -105,6 +114,7 @@ fun DashboardScreen(company: Company, model: DashboardViewModel, cashModel: Cash
             canDuplicate = if (state.detailDirection == InvoiceDirection.Outgoing) state.canCreateOutgoing else state.canCreateIncoming,
             recipient = if (state.detailDirection == InvoiceDirection.Outgoing) company.name else detail.partner,
             modifier = modifier)
+        else if (tab == DashboardTab.Company) CompanyScreen(company, profile, companyModel::refresh, companyModel::openAccount, { switcher = true }, modifier)
         else if (cash.detail != null || tab == DashboardTab.Cash) CashScreen(cash, cashModel, modifier)
         else if (tab == DashboardTab.Overview) OverviewScreen(state, model::selectYear, model::refreshOverview, modifier)
         else InvoiceListScreen(if (direction == InvoiceDirection.Outgoing) state.outgoing else state.incoming, direction,
@@ -351,14 +361,14 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 @Composable
-private fun Loading(label: String) {
+internal fun Loading(label: String) {
     Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
         Text(label)
     }
 }
 @Composable
-private fun ErrorCard(error: String, onRetry: () -> Unit) {
+internal fun ErrorCard(error: String, onRetry: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(error, color = MaterialTheme.colorScheme.error)
         OutlinedButton(onClick = onRetry) { Text("Zkusit znovu") }

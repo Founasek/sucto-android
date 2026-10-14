@@ -84,6 +84,10 @@ class AuthViewModel : ViewModel() {
         val sessionToken = requireNotNull(token)
         return CashViewModel.Factory(api, sessionToken, companyId) { expireSession(sessionToken) }
     }
+    fun companyFactory(companyId: Int): CompanyViewModel.Factory {
+        val sessionToken = requireNotNull(token)
+        return CompanyViewModel.Factory(api, sessionToken, companyId) { expireSession(sessionToken) }
+    }
     private fun expireSession(expectedToken: String) {
         if (token != expectedToken) return
         token = null

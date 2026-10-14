@@ -1,7 +1,9 @@
 package cz.sucto.android
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.view.WindowManager
+import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
@@ -35,6 +37,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import cz.sucto.android.ui.AppLockViewModel
+import cz.sucto.android.ui.CompanyViewModel
+import cz.sucto.android.ui.LockScreen
 import cz.sucto.android.ui.CashViewModel
 import cz.sucto.android.ui.DashboardScreen
 import cz.sucto.android.ui.DashboardViewModel
@@ -43,7 +48,15 @@ import cz.sucto.android.ui.AuthState
 import cz.sucto.android.ui.AuthViewModel
 import cz.sucto.android.ui.theme.*
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+    private val lock: AppLockViewModel by viewModels()
+
+    // V přepínači aplikací se nesmí ukázat obsah: okno je při odchodu do pozadí označené jako zabezpečené.
+    override fun onPause() { window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE); super.onPause() }
+    override fun onResume() { super.onResume(); window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    override fun onStop() { lock.onStop(); super.onStop() }
+    override fun onStart() { super.onStart(); lock.onStart(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -57,9 +70,14 @@ class MainActivity : ComponentActivity() {
                     val dashboard: DashboardViewModel = viewModel(viewModelStoreOwner = owner, key = "dashboard-${state.sessionId}-${company.id}",
                         factory = model.dashboardFactory(company.id))
                     val cash: CashViewModel = viewModel(viewModelStoreOwner = owner, key = "cash-${state.sessionId}-${company.id}", factory = model.cashFactory(company.id))
-                    DashboardScreen(company, dashboard, cash, onCompanies = { model.selectCompany(null) }, onLogout = model::logout)
+                    val profile: CompanyViewModel = viewModel(viewModelStoreOwner = owner, key = "company-${state.sessionId}-${company.id}", factory = model.companyFactory(company.id))
+                    DashboardScreen(company, state.companies, dashboard, cash, profile, onSwitchCompany = model::selectCompany,
+                        onCompanies = { model.selectCompany(null) }, onLogout = model::logout)
                 } else if (state.signedIn) CompaniesScreen(state, model::refreshCompanies, model::logout, model::selectCompany)
                 else LoginScreen(state, model::login)
+                // Zámek překrývá celou aplikaci, ale jen po přihlášení (relace je zatím jen v paměti).
+                val lockState by lock.state.collectAsStateWithLifecycle()
+                if (state.signedIn && lockState.locked) LockScreen(lock, this@MainActivity)
             }
         }
     }

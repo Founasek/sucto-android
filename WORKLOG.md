@@ -49,3 +49,10 @@
 - Další etapa: úhrady a e-maily, úpravy existujících položek, partneři/ARES a exporty; poté offline data, biometrie a widget.
 
 - Zadavatel požádal o commit a push aktuální fáze na origin/main. Sestavení ani testy se pro tento snapshot nespouštějí.
+
+## 2026-10-14
+
+- Převzato z iOS: záložka Firma (údaje o firmě, účty s detailem, přepínač firem i opakovaným klepnutím na záložku), z menu odebráno „Změnit firmu“.
+- Převzato z iOS: zámek aplikace přes BiometricPrompt (biometrie/kód zařízení) bez možnosti vypnutí, jedno automatické ověření na zamčení, skrytý obsah v přepínači aplikací.
+- Nepřevedeno, protože v Androidu zatím neexistuje: partneři, upozornění, widget, nastavení.
+- Bez sestavení, spuštění, testů a volání API dle pokynu zadavatele; nové závislosti androidx.biometric 1.1.0 a androidx.fragment-ktx 1.8.3 nejsou ověřeny sestavením.
