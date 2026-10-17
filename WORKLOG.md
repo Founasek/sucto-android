@@ -49,3 +49,18 @@
 - Další etapa: úhrady a e-maily, úpravy existujících položek, partneři/ARES a exporty; poté offline data, biometrie a widget.
 
 - Zadavatel požádal o commit a push aktuální fáze na origin/main. Sestavení ani testy se pro tento snapshot nespouštějí.
+
+## 2026-10-14
+
+- Převzato z iOS: záložka Firma (údaje o firmě, účty s detailem, přepínač firem i opakovaným klepnutím na záložku), z menu odebráno „Změnit firmu“.
+- Převzato z iOS: zámek aplikace přes BiometricPrompt (biometrie/kód zařízení) bez možnosti vypnutí, jedno automatické ověření na zamčení, skrytý obsah v přepínači aplikací.
+- Nepřevedeno, protože v Androidu zatím neexistuje: partneři, upozornění, widget, nastavení.
+- Bez sestavení, spuštění, testů a volání API dle pokynu zadavatele; nové závislosti androidx.biometric 1.1.0 a androidx.fragment-ktx 1.8.3 nejsou ověřeny sestavením.
+- Etapa 4: trvalá relace (token šifrovaný klíčem z Android Keystore), obnova po startu se zámkem, paměť poslední firmy.
+- Etapa 4: partneři (seznam, hledání, detail, ARES, smazání), úhrada vydané faktury s potvrzením, e-mail, upomínky (výchozí vypnuté), CSV export, Nastavení, šifrovaná offline cache a štítek.
+- Zbývá z důležitých funkcí: přehled (stáří pohledávek, prognóza 30 dní, žebříček partnerů, více měn), upozornění na splatnost (WorkManager, neutrální text), widget, úpravy položek faktury, ruční formulář partnera, Pohoda XML, rychlé přihlášení.
+- Stále bez sestavení, spuštění, testů a volání API dle pokynu zadavatele.
+- Design (2026-10-14): sdílené prvky v ui/Components.kt a ui/theme (karta 20, hero 28 s přechodem, kapslový přepínač, filtrové kapsle, odznak stavu, tlačítka s přechodem, prázdné/chybové/načítací stavy), flat záhlaví na barvě pozadí, spodní lišta s indikátorem, plovoucí kapsle „Nová faktura“, přehled s hero kartou a grafem se zaoblenými sloupci, detail faktury s hero kartou a sekcemi, automatické dočítání seznamů. Obrazovky Přehled/Faktury/Pokladna rozděleny do samostatných souborů. Bez sestavení a bez vizuální kontroly na telefonu.
+- Přehled: stáří po splatnosti a prognóza na 30 dní (po měnách, česká koruna první), nejbližší splatnosti s odkazem na detail. Upozornění na splatnost přes WorkManager (výchozí neutrální). Logo firmy: sleduje přesměrování, zvedá http na https a skládá relativní adresy. Zbývá: widget, žebříček partnerů a srovnání roků, úpravy položek faktury, ruční formulář partnera, Pohoda XML, rychlé přihlášení.
+- Přihlášení: tlačítko pro zobrazení hesla, biometrické přihlášení uloženým heslem (Keystore, per-use biometrie). Přehled: grafy po měsících pro více měn v pageru. Spodní lišta: vlastní vektorové ikony (přehled, faktury, pokladna, firma).
+- Barva aplikace (2026-10-17): sedm předvoleb (ui/theme/AppAccent.kt, ThemeState), volba v Nastavení > Vzhled, ukládá se v AppSettings. Přebarvuje prvky, přechody, tmavé plochy, výnosy/vydané; náklady/přijaté mají protiváhu (u oranžové modrou). Stavy faktur zůstávají ve svých barvách. Sestavení (compileDebugKotlin) projde, vizuální kontrola na telefonu zbývá.

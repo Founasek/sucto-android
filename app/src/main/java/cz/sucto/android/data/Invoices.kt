@@ -54,6 +54,7 @@ data class InvoiceQuery(val search: String = "", val filter: InvoiceFilter = Inv
     val currencyId: Int? = null, val currencyIso: String = "CZK", val accountId: Int? = null,
     val iban: String? = null, val bankIban: String? = null, val bankNumber: String? = null, val bankAccountNumber: String? = null,
     val bankCode: String? = null, val remaining: BigDecimal? = null, val footer: String? = null, val order: String? = null,
+    val partnerEmail: String? = null, val uzp: String? = null, val type: String? = null,
 ) {
     val isOverdue: Boolean get() = statusId !in listOf(1, 8, 10, 11) &&
         parseApiDate(due)?.isBefore(LocalDate.now()) == true
@@ -75,7 +76,8 @@ data class InvoiceQuery(val search: String = "", val filter: InvoiceFilter = Inv
                 value.optJSONObject("currency")?.text("iso_code") ?: "CZK",
                 value.optJSONObject("account")?.let { if (it.isNull("id")) null else it.getInt("id") },
                 lossyText(value.opt("iban")), bank?.text("iban"), lossyText(value.opt("bank_number")), bank?.text("account"),
-                bank?.text("bank_code"), value.decimal("remaining"), value.text("foot_notice"), value.text("order_number"))
+                bank?.text("bank_code"), value.decimal("remaining"), value.text("foot_notice"), value.text("order_number"),
+                partner?.text("email"), value.text("uzp_date_at"), value.text("actuarial_type"))
         }
     }
 }
@@ -101,7 +103,10 @@ fun parseApiDate(value: String?): LocalDate? {
 fun dateLabel(value: String?): String = parseApiDate(value)?.format(DateTimeFormatter.ofPattern("d. M. yyyy")) ?: value ?: "—"
 data class MonthlyFigure(val month: Int, val revenue: BigDecimal, val cost: BigDecimal)
 data class OverviewSection(val currency: String, val revenue: BigDecimal, val cost: BigDecimal,
-    val result: BigDecimal, val months: List<MonthlyFigure>)
+    val result: BigDecimal, val months: List<MonthlyFigure>,
+    val topCustomers: List<RankedParty> = emptyList(), val topSuppliers: List<RankedParty> = emptyList())
+/** Protistrana a součet základu faktur za rok (v jedné měně). */
+data class RankedParty(val name: String, val amount: BigDecimal)
 data class Overview(val sections: List<OverviewSection>, val fromInvoices: Boolean)
 internal data class AccountingValue(val value: BigDecimal, val currency: String)
 internal fun accountingValue(text: String?): AccountingValue? {

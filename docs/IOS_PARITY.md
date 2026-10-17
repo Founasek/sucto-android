@@ -7,25 +7,26 @@ Toto je mapa zdrojového kódu, nikoli potvrzení shody při běhu. iOS změny s
 | --- | --- | --- |
 | Přihlášení | POST sessions/create, email/password, authentication_token | První implementace, neověřeno |
 | Firmy | GET companies, výběr aktivní firmy | Načtení a výběr firmy, změna firmy z menu |
-| Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury; srovnání/aging/forecast/partneři/zpráva zbývají |
+| Přehled | roky/měsíce, výsledky, grafy, měny, srovnání, aging, forecast, top partneři, systémová zpráva | Roční/měsíční součty a graf, fallback na faktury, stáří po splatnosti, prognóza na 30 dní s nejbližšími splatnostmi (klepnutím detail), pageru po měnách; žebříček největších odběratelů a dodavatelů (jen v přehledu z faktur, jako v iOS); srovnání s minulým rokem a systémová zpráva zbývají |
 | Faktury | Vydané/přijaté, stránkování, hledání, rychlé a podrobné filtry | Oba směry, hledání, rychlé i podrobné filtry a další stránky; neověřeno za běhu |
 | Detail faktury | stavy, položky, partner, účet, data, kopírování, platební QR | Čtení detailu, stav, datumy, VS, účet, položky a QR včetně sdílení; kopírování jednotlivých polí zbývá |
-| Akce faktury | úhrada vydané faktury, e-mail, ruční upomínka | Zbývá |
+| Akce faktury | úhrada vydané faktury, e-mail, ruční upomínka | Úhrada (s potvrzením, GET /pay), odeslání e-mailem (PATCH send_to_email) a upomínka s upravitelným textem implementovány; upomínky jsou ve výchozím stavu vypnuté |
 | Nová faktura | oba směry, číselníky, položky, DPH, součty, duplikace | Formulář obou směrů, partneři, číselníky, položky, výpočty, validace a duplikace implementovány; neověřeno za běhu |
 | Úpravy položek | přidání, úprava a mazání řádků existující faktury | Zbývá |
 | Pokladna | příjmové/výdajové, hledání, stránkování, detail, odeslání | Oba směry, hledání, další stránky a základní detail; odesílání zbývá |
-| Partneři | hledání, detail, obratové grafy, formulář, úprava/mazání, ARES | Zbývá |
-| Účty | seznam, detail, měna | Zbývá |
-| Export | CSV aktuálního filtru, Pohoda XML jednotlivě/období a sdílení | Zbývá |
+| Partneři | hledání, detail, obratové grafy, formulář, úprava/mazání, ARES | Seznam s hledáním, detail, přidání z ARES a smazání (vstup ze záložky Firma); obratové grafy a ruční formulář/úprava zbývají |
+| Firma | záložka Firma: údaje (GET companies/{id}), účty, partneři, přepnutí firmy (tlačítko, opakované klepnutí na záložku) | Údaje, účty a přepnutí firmy (tlačítko i opakované klepnutí) implementovány; partneři zbývají; DIČ API nevrací |
+| Účty | seznam, detail, měna | Seznam a detail účtů v záložce Firma (kopírování čísla účtu, IBAN, SWIFT); měna zůstatku zbývá |
+| Export | CSV aktuálního filtru, Pohoda XML jednotlivě/období a sdílení | CSV aktuálního hledání a filtrů (UTF-8 s BOM, `;`) a sdílení; Pohoda XML zbývá |
 | Skeny | kamera/soubory, upload, polling, náhled, předvyplnění přijaté faktury | V iOS vypnuto; Android zachová přepínač |
-| Relace | Keychain token, odhlášení na 401, mazání cache při odhlášení | Zatím token pouze v paměti, 401 odhlásí |
+| Relace | Keychain token, odhlášení na 401, mazání cache při odhlášení | Token šifrovaný klíčem z Android Keystore (AES-GCM), obnova po startu se zámkem, 401 i odhlášení mažou token a cache |
 | Oprávnění | create/read/update/destroy pro ActuarialsIn/Out a Partner | create u faktur implementováno; ostatní zdroje/akce zbývají |
-| Offline | uložená GET data, datum cache, platnost 30 dní, šifrování | Zbývá |
-| Zámek | biometrie/kód zařízení, studený start, prodleva 0/60/300 s | Zbývá, Android BiometricPrompt/Keystore |
-| Uložené přihlášení | volitelné, zabezpečené, biometrické ověření | Zbývá |
-| Upozornění | splatnosti denně 9:00, bez částek a jmen, plánování při otevření | Zbývá |
-| Widget | snapshot splatností firmy, obnova po otevření, soukromí | Zbývá, Android AppWidget |
-| Nastavení | zámek, rychlé přihlášení, upozornění, upomínky, widget, cache, verze | Zbývá |
+| Offline | uložená GET data, datum cache, platnost 30 dní, šifrování | Šifrovaná cache GET odpovědí (Keystore), platnost 30 dní, vynechává `_cont`, `/new`, `/pay`, štítek „Offline – data z …“ |
+| Zámek | biometrie/kód zařízení, vždy zapnutý (nejde vypnout), studený start, prodleva 0/60/300 s | BiometricPrompt s kódem zařízení jako zálohou, nejde vypnout, prodleva pevně 60 s, jedno automatické ověření na zamčení, skryté okno v přepínači aplikací (FLAG_SECURE); volba prodlevy a zámek po studeném startu čekají na trvalou relaci |
+| Uložené přihlášení | volitelné, zabezpečené, biometrické ověření | Nabídka po ručním přihlášení (Uložit / Teď ne / Nikdy), e-mail a heslo zašifrované klíčem z Keystore, který jde použít jen po biometrii (silná biometrie, klíč se zneplatní při změně biometrie); přihlášení tlačítkem na přihlašovací stránce, smazání v Nastavení i na přihlašovací stránce |
+| Upozornění | splatnosti denně 9:00, ve výchozím stavu neutrální text bez firmy a počtů, podrobnosti jen na výslovné zapnutí | WorkManager denně kolem 9:00, úloha si sama načte nezaplacené faktury naposledy otevřené firmy; výchozí neutrální text, podrobnosti na zapnutí a na zamčené obrazovce vždy jen veřejná neutrální verze; klepnutí otevře aplikaci (bez odkazu na seznam po splatnosti) |
+| Widget | snapshot splatností firmy, obnova po otevření, soukromí (jména i částky skryté na zamčené obrazovce) | Zbývá, Android AppWidget; skrývat jména i částky na zamčeném zařízení |
+| Nastavení | zámek, rychlé přihlášení, upozornění, upomínky, widget, cache, verze | Prodleva zámku, upomínky (zapnutí a text), verze, odhlášení; upozornění, widget a rychlé přihlášení zbývají |
 
 ## Smlouva API a významné zvláštnosti
 
@@ -78,3 +79,12 @@ Odpovědi API mají český formát dd. MM. yyyy (iOS String.toDate). Parametry 
   SPAYD je generován lokálně bez sdílení finančních údajů s generátorem třetí strany.
   AM se omezí na podporovaných 9 999 999,99; nad tímto limitem se QR nenabízí.
 - Nic nebylo sestaveno, spuštěno ani testováno podle pokynu zadavatele.
+## Shoda s iOS 2026-10-14 (Firma, zámek, soukromí)
+
+- Záložka Firma: Přehled / Faktury / Pokladna / Firma. „Změnit firmu“ z menu je pryč, firmu lze přepnout tlačítkem na záložce
+  nebo opakovaným klepnutím na záložku Firma. Přepnutí čistí view modely původní firmy, takže faktury a přehled patří nové firmě.
+- Zámek aplikace nejde vypnout. Bez kódu nebo biometrie na zařízení se zamknout nedá.
+- Android nemá obdobu iOS Privacy Manifestu. Odpovídá mu formulář Data safety v Google Play Console; při publikaci uvést e-mail,
+  finanční údaje a obsah uživatele (jen funkce aplikace, bez sdílení třetím stranám a bez sledování).
+- Vstupní animace karet, které se v iOS odstranily, Android nikdy neměl; pozadí všech záložek je `MaterialTheme.colorScheme.background`.
+- Beze změny: partneři, upozornění a widget v Androidu zatím neexistují, proto se tam nic neupravovalo.

@@ -37,8 +37,9 @@ fun InvoiceCreateHost(factory: InvoiceCreateViewModel.Factory, owner: ViewModelS
     if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Zahodit rozepsanou fakturu?") },
         text = { Text("Neuložené změny se ztratí.") }, confirmButton = { TextButton(onClick = onClose) { Text("Zahodit") } },
         dismissButton = { TextButton(onClick = { discard = false }) { Text("Pokračovat v úpravách") } })
-    Scaffold(topBar = {
-        TopAppBar(title = { Text(if (model.copyId != null) "Duplikovat fakturu" else if (model.direction == InvoiceDirection.Outgoing) "Nová vydaná faktura" else "Nová přijatá faktura") },
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
+        TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background,
+            scrolledContainerColor = MaterialTheme.colorScheme.background), title = { Text(if (model.copyId != null) "Duplikovat fakturu" else if (model.direction == InvoiceDirection.Outgoing) "Nová vydaná faktura" else "Nová přijatá faktura") },
             navigationIcon = { IconButton(onClick = { close() }, enabled = !state.submitting) { Icon(Icons.Default.ArrowBack, contentDescription = "Zpět") } })
     }) { padding ->
         val refs = state.references
@@ -111,11 +112,8 @@ fun InvoiceCreateHost(factory: InvoiceCreateViewModel.Factory, owner: ViewModelS
                     }
                 }
                 item {
-                    Button(onClick = model::submit, enabled = !state.submitting && state.createdId == null,
-                        modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(14.dp)) {
-                        if (state.submitting) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                        else Text("Vytvořit fakturu")
-                    }
+                    GradientButton(if (state.submitting) "Vytvářím…" else "Vytvořit fakturu", model::submit,
+                        enabled = !state.submitting && state.createdId == null)
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
                 }
             }
@@ -142,11 +140,9 @@ fun InvoiceCreateHost(factory: InvoiceCreateViewModel.Factory, owner: ViewModelS
 
 @Composable
 internal fun FormSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            content()
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(title)
+        SuctoCard { content() }
     }
 }
 @Composable

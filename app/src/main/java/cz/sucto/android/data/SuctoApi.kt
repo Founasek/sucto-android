@@ -9,6 +9,7 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Response
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,7 +18,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Contract from iOS APIService. Never log credentials, tokens or response bodies. */
-class SuctoApi {
+class SuctoApi(private val cache: ResponseCache? = null) {
+    /** Čas uložení dat, která se právě zobrazují z cache při výpadku připojení; `null`, pokud jsou aktuální. */
+    val cachedDataDate = kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -39,8 +42,58 @@ class SuctoApi {
         val array = JSONArray(request("companies", token))
         return List(array.length()) { index ->
             val item = array.getJSONObject(index)
-            Company(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"), item.getInt("country_id"))
+            Company(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"), item.getInt("country_id"), logoOf(item))
         }
+    }
+
+    /** GET companies/{id}: údaje o firmě včetně adresy (DIČ endpoint nevrací). */
+    suspend fun companyDetail(token: String, companyId: Int): CompanyDetail {
+        val item = JSONObject(request("companies/$companyId", token))
+        val address = item.optJSONObject("address")
+        val street = listOfNotNull(address?.text("street"), address?.text("city_part")).filter { it.isNotBlank() }.joinToString(", ")
+        val city = listOfNotNull(address?.text("zip"), address?.text("city")).filter { it.isNotBlank() }.joinToString(" ")
+        return CompanyDetail(item.getInt("id"), item.getString("name"), item.getString("ic"), item.getBoolean("is_taxable"),
+            item.text("email"), listOf(street, city).filter { it.isNotEmpty() })
+    }
+
+    /** GET companies/{id}/accounts: bankovní i pokladní účty (account_type 1 = pokladna). */
+    suspend fun accounts(token: String, companyId: Int): List<CompanyAccount> {
+        val values = JSONArray(request("companies/$companyId/accounts", token))
+        return List(values.length()) {
+            val item = values.getJSONObject(it)
+            val bank = item.optJSONObject("bank_account")
+            CompanyAccount(item.optInt("id", -(it + 1)), item.getString("name"), item.optInt("account_type") == 1,
+                item.optBoolean("is_deactivated"), item.text("prefix"), item.text("opening_balance"),
+                bank?.text("account"), bank?.text("bank_code"), bank?.text("iban"), bank?.text("swift"), bank?.text("bank_name"))
+        }
+    }
+
+    /**
+     * Nezaplacené faktury se splatností do [horizon] (a všechny prošlé), vydané i přijaté. API nemá souhrn ani filtr „nezaplaceno“,
+     * proto se pro každý nezaplacený stav (připraveno … částečně uhrazeno) ptáme zvlášť.
+     */
+    suspend fun dueItems(token: String, companyId: Int, horizon: java.time.LocalDate): List<DueItem> = coroutineScope {
+        suspend fun load(direction: InvoiceDirection): List<DueItem> = coroutineScope {
+            val all = UNPAID_STATUSES.map { status -> async {
+                val collected = mutableListOf<Invoice>()
+                for (page in 1..5) {
+                    val query = InvoiceQuery(advanced = InvoiceAdvancedFilter(status = status, dueTo = horizon))
+                    val values = invoices(token, companyId, direction, query.parameters(page))
+                    if (values.isEmpty()) break
+                    collected += values
+                }
+                collected
+            } }.flatMap { it.await() }
+            all.distinctBy { it.id }.mapNotNull { invoice ->
+                val due = parseApiDate(invoice.due) ?: return@mapNotNull null
+                if (invoice.statusId in listOf(1, 8, 10, 11)) return@mapNotNull null
+                DueItem(invoice.id, direction == InvoiceDirection.Incoming, invoice.number, invoice.partner, due,
+                    invoice.remaining?.takeIf { it.signum() > 0 } ?: invoice.total ?: java.math.BigDecimal.ZERO, invoice.currency)
+            }
+        }
+        val outgoing = async { load(InvoiceDirection.Outgoing) }
+        val incoming = async { load(InvoiceDirection.Incoming) }
+        outgoing.await() + incoming.await()
     }
 
     suspend fun invoices(token: String, companyId: Int, direction: InvoiceDirection, params: Map<String, String>): List<Invoice> {
@@ -73,6 +126,29 @@ class SuctoApi {
                 item.optJSONObject("currency")?.let { c -> if (c.isNull("id")) null else c.getInt("id") })
         }
     }
+    /** Jedna stránka partnerů (hledání na serveru podle názvu, IČ, DIČ a adresy). */
+    suspend fun partnerRecords(token: String, companyId: Int, search: String, page: Int, limit: Int): List<PartnerRecord> {
+        val params = mutableMapOf("page" to page.toString(), "limit" to limit.toString())
+        if (search.isNotBlank()) params["q[name_or_ic_or_dic_or_address_street_or_address_city_cont]"] = search.trim()
+        val array = JSONArray(request(queryPath("companies/$companyId/partners", params), token))
+        return List(array.length()) { PartnerRecord.fromJson(array.getJSONObject(it)) }
+    }
+    suspend fun partnerRecord(token: String, companyId: Int, partnerId: Int): PartnerRecord =
+        PartnerRecord.fromJson(JSONObject(request("companies/$companyId/partners/$partnerId", token)))
+    /** Vytvoří partnera podle IČO z ARES (POST s prázdným JSON tělem). */
+    suspend fun createPartnerByAres(token: String, companyId: Int, ic: String): PartnerRecord =
+        PartnerRecord.fromJson(JSONObject(request("companies/$companyId/partners/create_by_ares/$ic", token, "{}")))
+    /** Úhrada vydané faktury je v API `GET .../pay` (vytvoří pokladní doklad); nikdy se nevolá automaticky ani z cache. Vrací id dokladu. */
+    suspend fun payInvoice(token: String, companyId: Int, invoiceId: Int): Int =
+        JSONObject(request("companies/$companyId/actuarials_outs/$invoiceId/pay", token)).optInt("cash_voucher_id")
+    suspend fun sendInvoiceEmail(token: String, companyId: Int, invoiceId: Int, email: String, comment: String) {
+        val body = JSONObject().put("email", email).apply { if (comment.isNotBlank()) put("comment", comment) }.toString()
+        request("companies/$companyId/actuarials_outs/$invoiceId/send_to_email", token, body, method = "PATCH")
+    }
+    suspend fun deletePartner(token: String, companyId: Int, partnerId: Int) {
+        request("companies/$companyId/partners/$partnerId", token, method = "DELETE")
+    }
+
     suspend fun draftReferences(token: String, company: Company): DraftReferences = kotlinx.coroutines.coroutineScope {
         val currencies = async { choices(JSONArray(request("currencies", token)), currency = true) }
         val accounts = async {
@@ -119,6 +195,12 @@ class SuctoApi {
             }
         }
     }
+    /** Nejvyšší součty základu podle protistrany v dané měně, nejvýše pět. */
+    private fun ranking(invoices: List<Invoice>, currency: String): List<RankedParty> =
+        invoices.filter { it.currency == currency }.groupBy { it.partner?.takeIf { name -> name.isNotBlank() } ?: "Neuvedeno" }
+            .map { (name, list) -> RankedParty(name, list.fold(java.math.BigDecimal.ZERO) { acc, invoice -> acc + (invoice.base ?: java.math.BigDecimal.ZERO) }) }
+            .filter { it.amount.signum() != 0 }.sortedWith(compareByDescending<RankedParty> { it.amount }.thenBy { it.name }).take(5)
+
     suspend fun overview(token: String, companyId: Int, year: Int): Overview {
         val zero = java.math.BigDecimal.ZERO
         try {
@@ -169,21 +251,27 @@ class SuctoApi {
             val months = (1..12).map { MonthlyFigure(it, sum(issued, it), sum(received, it)) }
             val revenue = months.fold(zero) { acc, m -> acc + m.revenue }
             val cost = months.fold(zero) { acc, m -> acc + m.cost }
-            OverviewSection(currency, revenue, cost, revenue - cost, months)
+            OverviewSection(currency, revenue, cost, revenue - cost, months,
+                ranking(issued, currency), ranking(received, currency))
         }.filter { it.months.any { m -> m.revenue.signum() != 0 || m.cost.signum() != 0 } }
         return Overview(sections, true)
     }
-    private suspend fun request(path: String, token: String? = null, body: String? = null): String =
+    private suspend fun request(path: String, token: String? = null, body: String? = null, method: String? = null): String =
         suspendCancellableCoroutine { continuation ->
             val builder = Request.Builder().url(BASE_URL + path).header("Accept", "application/json")
             if (token != null) builder.header("Auth-Token", token)
-            if (body != null) builder.post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
+            if (method == "DELETE") builder.delete()
+            else if (method == "PATCH") builder.patch((body ?: "{}").toRequestBody("application/json; charset=utf-8".toMediaType()))
+            else if (body != null) builder.post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
             val call = client.newCall(builder.build())
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
-                    if (continuation.isActive) continuation.resumeWithException(
-                        ApiException("Nepodařilo se připojit. Zkontrolujte připojení k internetu."))
+                    if (!continuation.isActive) return
+                    // Při výpadku připojení se čtení vrátí z cache (zašifrované, nejvýš 30 dní stará).
+                    val saved = if (call.isCanceled() || !ResponseCache.isCacheable(path, method, body)) null else cache?.load(path)
+                    if (saved != null) { cachedDataDate.value = saved.savedAt; continuation.resume(saved.payload) }
+                    else continuation.resumeWithException(ApiException("Nepodařilo se připojit. Zkontrolujte připojení k internetu."))
                 }
                 override fun onResponse(call: Call, response: Response) {
                     try {
@@ -197,6 +285,8 @@ class SuctoApi {
                                 else -> throw ApiException("Server není dostupný (${it.code}). Zkuste to znovu.", statusCode = it.code)
                             }
                         }
+                        if (ResponseCache.isCacheable(path, method, body)) cache?.store(path, payload)
+                        cachedDataDate.value = null
                         if (continuation.isActive) continuation.resume(payload)
                     } catch (error: Exception) {
                         if (continuation.isActive) continuation.resumeWithException(
@@ -216,7 +306,21 @@ class SuctoApi {
         }
     }.getOrNull()
 
-    companion object { const val BASE_URL = "https://www.sucto.cz/api/" }
+    companion object {
+        const val BASE_URL = "https://www.sucto.cz/api/"
+        private val UNPAID_STATUSES = listOf(2, 3, 4, 5, 6, 7)
+    }
 }
-data class Company(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val countryId: Int)
+/** Logo bývá text s adresou; kdyby server poslal objekt, vezme se z něj `url`. */
+private fun logoOf(item: JSONObject): String? = when (val value = item.opt("logo")) {
+    is String -> value.takeIf { it.isNotBlank() }
+    is JSONObject -> value.text("url")
+    else -> null
+}
+data class Company(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val countryId: Int, val logo: String? = null)
+data class CompanyDetail(val id: Int, val name: String, val ic: String, val isTaxable: Boolean, val email: String?, val addressLines: List<String>)
+data class CompanyAccount(val id: Int, val name: String, val isCash: Boolean, val isDeactivated: Boolean, val prefix: String?,
+    val openingBalance: String?, val account: String?, val bankCode: String?, val iban: String?, val swift: String?, val bankName: String?) {
+    val accountNumber: String? get() = account?.let { it + (bankCode?.let { code -> "/$code" } ?: "") }
+}
 class ApiException(message: String, val unauthorized: Boolean = false, val statusCode: Int? = null) : Exception(message)

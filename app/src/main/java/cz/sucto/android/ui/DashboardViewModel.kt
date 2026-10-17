@@ -23,7 +23,8 @@ data class DashboardState(val year: Int = LocalDate.now().year, val overview: Ov
     val overviewLoading: Boolean = false, val overviewError: String? = null,
     val outgoing: InvoiceListState = InvoiceListState(), val incoming: InvoiceListState = InvoiceListState(),
     val createDirection: InvoiceDirection? = null, val copyInvoiceId: Int? = null, val detailDirection: InvoiceDirection = InvoiceDirection.Outgoing,
-    val detail: Invoice? = null, val detailLoading: Boolean = false, val detailError: String? = null)
+    val detail: Invoice? = null, val detailLoading: Boolean = false, val detailError: String? = null, val actionBusy: Boolean = false,
+    val aging: AgingSummary? = null, val forecast: ForecastSummary? = null)
 
 class DashboardViewModel(private val api: SuctoApi, private val token: String, private val companyId: Int,
     private val onUnauthorized: () -> Unit) : ViewModel() {
@@ -35,6 +36,7 @@ class DashboardViewModel(private val api: SuctoApi, private val token: String, p
     private var permissionsJob: Job? = null
     private var overviewJob: Job? = null
     private var detailJob: Job? = null
+    private var dueJob: Job? = null
     private val listJobs = mutableMapOf<InvoiceDirection, Job>()
     private val generations = mutableMapOf<InvoiceDirection, Int>()
     private var overviewGeneration = 0
@@ -43,6 +45,7 @@ class DashboardViewModel(private val api: SuctoApi, private val token: String, p
     fun start() {
         loadPermissions()
         refreshOverview()
+        loadDueItems()
         refresh(InvoiceDirection.Outgoing)
         refresh(InvoiceDirection.Incoming)
         state.value.detail?.let { openInvoice(state.value.detailDirection, it) }
@@ -50,7 +53,7 @@ class DashboardViewModel(private val api: SuctoApi, private val token: String, p
     fun stop() {
         overviewGeneration++; detailGeneration++
         InvoiceDirection.entries.forEach { generations[it] = (generations[it] ?: 0) + 1 }
-        permissionsJob?.cancel(); overviewJob?.cancel(); detailJob?.cancel(); listJobs.values.forEach { it.cancel() }
+        permissionsJob?.cancel(); dueJob?.cancel(); overviewJob?.cancel(); detailJob?.cancel(); listJobs.values.forEach { it.cancel() }
     }
     private fun loadPermissions() {
         permissionsJob?.cancel()
@@ -65,12 +68,30 @@ class DashboardViewModel(private val api: SuctoApi, private val token: String, p
             }
         }
     }
+    /** Stáří po splatnosti a prognóza na 30 dní; jen doplněk – při chybě nebo při datech z cache zůstane předchozí stav. */
+    fun loadDueItems() {
+        dueJob?.cancel()
+        dueJob = viewModelScope.launch {
+            try {
+                val items = api.dueItems(token, companyId, LocalDate.now().plusDays(ForecastSummary.HORIZON_DAYS))
+                if (api.cachedDataDate.value == null) mutableState.update { it.copy(aging = AgingSummary(items), forecast = ForecastSummary(items)) }
+            } catch (error: CancellationException) { throw error
+            } catch (error: ApiException) { if (error.unauthorized) onUnauthorized()
+            } catch (error: Exception) { /* doplněk přehledu */ }
+        }
+    }
+    /** Otevře detail faktury podle id a směru (z karty prognózy). */
+    fun openDue(item: DueItem) {
+        val direction = if (item.isIncoming) InvoiceDirection.Incoming else InvoiceDirection.Outgoing
+        openInvoice(direction, Invoice(item.id, item.number, 2, "—", item.counterparty, item.amount, null, item.currency, null, null, null, null, emptyList()))
+    }
     fun selectYear(year: Int) {
         if (year == state.value.year) return
         mutableState.update { it.copy(year = year, overview = null) }
         refreshOverview()
     }
     fun refreshOverview() {
+        loadDueItems()
         overviewJob?.cancel()
         val generation = ++overviewGeneration
         val year = state.value.year
@@ -153,6 +174,44 @@ class DashboardViewModel(private val api: SuctoApi, private val token: String, p
             }
         }
     }
+    /** Uhradí vydanou fakturu (po potvrzení v UI): vytvoří pokladní doklad, pak obnoví detail, seznam i přehled. */
+    fun payInvoice(invoice: Invoice) {
+        if (state.value.actionBusy) return
+        mutableState.update { it.copy(actionBusy = true) }
+        viewModelScope.launch {
+            try {
+                val voucher = api.payInvoice(token, companyId, invoice.id)
+                mutableState.update { it.copy(actionBusy = false, message = "Zaplaceno" + if (voucher > 0) " – doklad č. $voucher" else "") }
+                openInvoice(InvoiceDirection.Outgoing, invoice); refresh(InvoiceDirection.Outgoing); refreshOverview()
+            } catch (error: CancellationException) { throw error
+            } catch (error: Exception) { mutableState.update { it.copy(actionBusy = false, message = handle(error)) } }
+        }
+    }
+    /** Pošle vydanou fakturu e-mailem (i jako upomínku). `done` dostane text chyby, nebo `null` při úspěchu. */
+    fun sendEmail(invoice: Invoice, email: String, comment: String, done: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                api.sendInvoiceEmail(token, companyId, invoice.id, email.trim(), comment)
+                mutableState.update { it.copy(message = "Odesláno: ${email.trim()}") }
+                done(null)
+            } catch (error: CancellationException) { throw error
+            } catch (error: Exception) { done(handle(error)) }
+        }
+    }
+    /** Všechny faktury odpovídající hledání a filtrům daného směru (pro export do CSV). */
+    suspend fun fetchAllMatching(direction: InvoiceDirection): List<Invoice> {
+        val query = list(direction).query
+        val all = mutableListOf<Invoice>()
+        val seen = mutableSetOf<Int>()
+        for (page in 1..100) {
+            val values = api.invoices(token, companyId, direction, query.parameters(page))
+            val fresh = values.filter { seen.add(it.id) }
+            if (fresh.isEmpty()) return all
+            all += if (query.filter == InvoiceFilter.Overdue) fresh.filter { it.isOverdue } else fresh
+        }
+        throw ApiException("Export obsahuje příliš mnoho stránek. Zpřesněte hledání nebo filtr.")
+    }
+    fun showMessage(text: String) = mutableState.update { it.copy(message = text) }
     fun closeInvoice() {
         detailGeneration++; detailJob?.cancel()
         mutableState.update { it.copy(detail = null, detailLoading = false, detailError = null) }
