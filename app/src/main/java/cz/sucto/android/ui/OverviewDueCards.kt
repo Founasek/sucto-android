@@ -65,7 +65,7 @@ internal fun ForecastCard(forecast: ForecastSummary, onOpen: (DueItem) -> Unit) 
 
 @Composable
 private fun UpcomingRow(item: DueItem, onClick: () -> Unit) {
-    val color = if (item.isIncoming) Amber else Brand
+    val color = if (item.isIncoming) Cost else Brand
     Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickableRow(onClick).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(if (item.isIncoming) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = if (item.isIncoming) "Platba" else "Příjem",
@@ -102,14 +102,14 @@ internal fun CurrencyPages(currencies: List<String>, page: @Composable (Int) -> 
 private fun ForecastPage(row: ForecastSummary.Row) {
     val axis = MaterialTheme.colorScheme.outlineVariant
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { LegendDot("Příjmy", Brand); LegendDot("Platby", Amber) }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { LegendDot("Příjmy", Brand); LegendDot("Platby", Cost) }
         Canvas(Modifier.fillMaxWidth().height(130.dp)) {
             val maximum = maxOf(1f, row.weeks.maxOf { maxOf(it.incoming.toFloat(), it.outgoing.toFloat()) })
             val slot = size.width / row.weeks.size
             val width = slot * .26f
             drawLine(axis, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
             row.weeks.forEachIndexed { index, week ->
-                listOf(week.incoming.toFloat() to Brand, week.outgoing.toFloat() to Amber).forEachIndexed { side, (amount, color) ->
+                listOf(week.incoming.toFloat() to Brand, week.outgoing.toFloat() to Cost).forEachIndexed { side, (amount, color) ->
                     val height = amount / maximum * size.height
                     drawRoundRect(color, Offset(slot * index + slot * .18f + side * width * 1.3f, size.height - height), Size(width, height), CornerRadius(3.dp.toPx()))
                 }
@@ -157,7 +157,7 @@ private fun AgingPage(row: AgingSummary.Row) {
         Row(Modifier.fillMaxWidth()) {
             Spacer(Modifier.weight(1f))
             Text("Vydané", Modifier.weight(1.3f), style = MaterialTheme.typography.labelMedium, color = Brand, fontWeight = FontWeight.SemiBold)
-            Text("Přijaté", Modifier.weight(1.3f), style = MaterialTheme.typography.labelMedium, color = Amber, fontWeight = FontWeight.SemiBold)
+            Text("Přijaté", Modifier.weight(1.3f), style = MaterialTheme.typography.labelMedium, color = Cost, fontWeight = FontWeight.SemiBold)
         }
         AgingSummary.BUCKETS.forEachIndexed { index, title ->
             val issued = row.issued[index]
@@ -206,7 +206,7 @@ internal fun TopPartiesCard(sections: List<OverviewSection>) {
 
 @Composable
 private fun TopPartiesPage(sections: List<OverviewSection>, customers: Boolean) {
-    val color = if (customers) Brand else Amber
+    val color = if (customers) Brand else Cost
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         sections.forEach { section ->
             val list = if (customers) section.topCustomers else section.topSuppliers

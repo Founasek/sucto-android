@@ -1,6 +1,7 @@
 package cz.sucto.android.data
 
 import android.content.Context
+import cz.sucto.android.ui.theme.AppAccent
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -29,6 +30,11 @@ object AppSettings {
     /** Za jak dlouho v pozadí se aplikace zamkne (ihned / 1 min / 5 min). */
     fun lockDelayMs(context: Context): Long = prefs(context).getLong("lockDelayMs", 60_000L)
     fun setLockDelayMs(context: Context, value: Long) = prefs(context).edit().putLong("lockDelayMs", value).apply()
+
+    /** Zvolená barva aplikace (výchozí zelená). */
+    fun accent(context: Context): AppAccent =
+        prefs(context).getString("accent", null)?.let { name -> AppAccent.entries.firstOrNull { it.name == name } } ?: AppAccent.Green
+    fun setAccent(context: Context, value: AppAccent) = prefs(context).edit().putString("accent", value.name).apply()
 
     /** Kdy byla k faktuře naposledy odeslána upomínka (jen na tomto zařízení), ať se neposílá dvakrát po sobě. */
     fun lastReminder(context: Context, invoiceId: Int): LocalDate? =

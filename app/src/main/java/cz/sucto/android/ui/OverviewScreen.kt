@@ -58,7 +58,7 @@ internal fun OverviewScreen(state: DashboardState, onYear: (Int) -> Unit, onRetr
                 item(key = "totals") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         FigureCard(if (overview.fromInvoices) "Vydané" else "Výnosy", section.revenue, section.currency, Brand, true, Modifier.weight(1f))
-                        FigureCard(if (overview.fromInvoices) "Přijaté" else "Náklady", section.cost, section.currency, Amber, false, Modifier.weight(1f))
+                        FigureCard(if (overview.fromInvoices) "Přijaté" else "Náklady", section.cost, section.currency, Cost, false, Modifier.weight(1f))
                     }
                 }
             }
@@ -120,7 +120,7 @@ private fun MonthlyChart(section: OverviewSection, fromInvoices: Boolean) {
         SectionLabel("Po měsících · ${section.currency}")
         SuctoCard {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Legend(revenueLabel, Brand); Legend(costLabel, Amber)
+                Legend(revenueLabel, Brand); Legend(costLabel, Cost)
             }
             Canvas(Modifier.fillMaxWidth().height(160.dp).semantics {
                 contentDescription = "Měsíční graf. Hodnoty zvoleného měsíce jsou uvedené pod grafem."
@@ -135,7 +135,7 @@ private fun MonthlyChart(section: OverviewSection, fromInvoices: Boolean) {
                 val width = slot * .28f
                 section.months.forEachIndexed { index, month ->
                     val dim = if (month.month == selected) 1f else .55f
-                    listOf(month.revenue.toFloat() to Brand, month.cost.toFloat() to Amber).forEachIndexed { side, (amount, color) ->
+                    listOf(month.revenue.toFloat() to Brand, month.cost.toFloat() to Cost).forEachIndexed { side, (amount, color) ->
                         val y = baseline - amount / span * size.height
                         drawRoundRect(color.copy(alpha = dim), Offset(slot * index + slot * .12f + side * width * 1.25f, kotlin.math.min(y, baseline)),
                             Size(width, abs(baseline - y)), CornerRadius(3.dp.toPx()))

@@ -14,6 +14,19 @@ import androidx.compose.ui.unit.dp
 import cz.sucto.android.data.AppSettings
 import cz.sucto.android.data.DueNotifications
 import cz.sucto.android.data.Reminders
+import cz.sucto.android.ui.theme.AppAccent
+import cz.sucto.android.ui.theme.ThemeState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 
 /** Nastavení: zámek (nejde vypnout, jen prodleva), upomínky (ve výchozím stavu vypnuté), odhlášení a verze. */
 @Composable
@@ -26,6 +39,16 @@ fun SettingsScreen(onLogout: () -> Unit, modifier: Modifier) {
     var reminders by remember { mutableStateOf(AppSettings.remindersEnabled(context)) }
     var template by remember { mutableStateOf(AppSettings.reminderTemplate(context)) }
     LazyColumn(modifier, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { Header("Vzhled") }
+        item {
+            Panel {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(AppAccent.entries.toList()) { accent -> AccentSwatch(accent, ThemeState.accent == accent) { ThemeState.select(context, accent) } }
+                }
+                Text("Barva aplikace platí pro ovládací prvky, tlačítka, hlavní karty a částky výnosů. Stavy faktur (např. zaplaceno) a upozornění zůstávají ve svých barvách.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         item { Header("Zabezpečení") }
         item {
             Panel {
@@ -108,6 +131,20 @@ fun SettingsScreen(onLogout: () -> Unit, modifier: Modifier) {
         item { Header("O aplikaci") }
         item { Panel { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Verze"); Text(version(context)) } } }
         item { SoftButton("Odhlásit se", onLogout, destructive = true) }
+    }
+}
+
+@Composable
+private fun AccentSwatch(accent: AppAccent, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(Modifier.size(44.dp).clip(CircleShape).background(Brush.linearGradient(accent.gradient))
+            .border(if (selected) 2.dp else 0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = if (selected) .5f else .1f), CircleShape),
+            contentAlignment = Alignment.Center) {
+            if (selected) Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+        }
+        Text(accent.title, style = MaterialTheme.typography.labelSmall,
+            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

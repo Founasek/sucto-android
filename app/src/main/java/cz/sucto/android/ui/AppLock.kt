@@ -32,7 +32,9 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import cz.sucto.android.R
 import cz.sucto.android.ui.theme.Ink
+import cz.sucto.android.ui.theme.InkGlow
 import cz.sucto.android.ui.theme.InkSoft
+import cz.sucto.android.ui.theme.BrandButton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -117,7 +119,7 @@ fun LockScreen(lock: AppLockViewModel, activity: FragmentActivity) {
     LaunchedEffect(state.locked) {
         if (state.locked && !lock.autoPromptUsed) { lock.markAutoPromptUsed(); activity.promptUnlock(lock) }
     }
-    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Ink, InkSoft, Color(0xFF246B3B)))).safeDrawingPadding()) {
+    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Ink, InkSoft, InkGlow))).safeDrawingPadding()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.weight(1f))
             Image(painterResource(R.drawable.sucto_logo), contentDescription = null, modifier = Modifier.size(96.dp).clip(RoundedCornerShape(24.dp)))
@@ -128,7 +130,7 @@ fun LockScreen(lock: AppLockViewModel, activity: FragmentActivity) {
             Spacer(Modifier.weight(1f))
             state.message?.let { Text(it, color = Color(0xFFFFB4AB), textAlign = TextAlign.Center); Spacer(Modifier.height(12.dp)) }
             if (!state.authenticating) Button(onClick = { activity.promptUnlock(lock) }, modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F9E55), contentColor = Color.White)) {
+                shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = BrandButton, contentColor = Color.White)) {
                 Text("Odemknout", fontWeight = FontWeight.SemiBold)
             } else Spacer(Modifier.height(54.dp))
             Spacer(Modifier.height(24.dp))

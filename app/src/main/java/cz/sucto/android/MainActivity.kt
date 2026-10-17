@@ -82,6 +82,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ThemeState.load(this)
         cz.sucto.android.data.DueNotifications.schedule(this)
         // Obnovená relace po studeném startu je zamčená; po otočení obrazovky (savedInstanceState) se nezamyká znovu.
         if (savedInstanceState == null && auth.state.value.signedIn && AppLockViewModel.isAvailable(this)) lock.lock()
@@ -125,7 +126,7 @@ private fun LoginScreen(state: AuthState, hasSaved: Boolean, onLogin: (String, S
     var showPassword by remember { mutableStateOf(false) }
     val submit = { onLogin(email, password) }
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Ink, InkSoft, Color(0xFF246B3B))))
+        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Ink, InkSoft, InkGlow)))
             .safeDrawingPadding().imePadding(),
     ) {
         Column(
@@ -168,7 +169,7 @@ private fun LoginScreen(state: AuthState, hasSaved: Boolean, onLogin: (String, S
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                     Button(onClick = { submit() }, enabled = !state.loading && email.isNotBlank() && password.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F9E55), contentColor = Color.White)) {
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandButton, contentColor = Color.White)) {
                         if (state.loading) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                         else Text(stringResource(R.string.login), fontWeight = FontWeight.SemiBold)
                     }
